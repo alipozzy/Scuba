@@ -284,76 +284,77 @@ def dashboard():
 # =========================
 @app.route('/apply', methods=['GET', 'POST'])
 def apply_leave():
-    # Periksa session (Pastikan guna 'user_id' seperti dalam login)
+    # 1. Semak Sesi (Guna 'user_id' untuk konsistensi dengan login)
     if 'user_id' not in session:
         flash("Sila login terlebih dahulu.", "warning")
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        # 1. Ambil data dari form
+        # 2. Ambil data dari borang HTML
+        leave_type_name = request.form.get('leave_type')
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
         reason = request.form.get('reason')
-        leave_type_name = request.form.get('leave_type')
-        is_half_day = request.form.get('is_half_day') == 'true'
-        duration = request.form.get('total_days') # Dari calculation JS di frontend
+        is_half_day = request.form.get('half_day') == 'on'  # Checkbox returns 'on'
+        
+        # Gunakan helper function anda untuk kira durasi yang tepat (termasuk Sabtu 0.5)
+        duration = calculate_duration(start_date, end_date, is_half_day)
 
-        # 2. Mapping Nama ke ID Database
-        leave_type_map = {
-            'Annual': 1,
-            'Medical': 2,
-            'Emergency': 3,
-            'Unpaid': 4
-        }
+        # 3. Mapping Nama Cuti ke ID Database (Sesuai skema PostgreSQL anda)
+        leave_type_map = {'Annual': 1, 'Medical': 2, 'Emergency': 3, 'Unpaid': 4}
         leave_type_id = leave_type_map.get(leave_type_name, 1)
 
         conn = get_db_connection()
         cur = conn.cursor()
 
         try:
-            # 3. Logik Auto-Approver (Cari manager_id berdasarkan dept_id user)
-            cur.execute("SELECT manager_id FROM departments WHERE dept_id = %s", (session.get('dept_id'),))
-            result = cur.fetchone()
-            approver_id = result[0] if result else None
+            # 4. Ambil Approver ID (Manager) berdasarkan dept_id pengguna
+            cur.execute("SELECT manager_id FROM employees WHERE emp_id = %s", (session['user_id'],))
+            user_info = cur.fetchone()
+            approver_id = user_info['manager_id'] if user_info else None
 
-            # 4. Simpan ke database (Guna column leave_type_id dan duration)
+            # 5. Masukkan ke dalam database leave_requests
             cur.execute("""
                 INSERT INTO leave_requests (
-                    emp_id, 
-                    leave_type_id, 
-                    start_date, 
-                    end_date, 
-                    reason, 
-                    status, 
-                    approver_id, 
-                    duration, 
-                    is_half_day
+                    emp_id, leave_type_id, start_date, end_date, 
+                    reason, status, approver_id, duration, is_half_day
                 ) VALUES (%s, %s, %s, %s, %s, 'Pending', %s, %s, %s)
             """, (
-                session['user_id'],
-                leave_type_id,
-                start_date,
-                end_date,
-                reason,
-                approver_id,
-                duration,
-                is_half_day
+                session['user_id'], leave_type_id, start_date, end_date, 
+                reason, approver_id, duration, is_half_day
             ))
 
             conn.commit()
-            flash("Permohonan cuti berjaya dihantar!", "success")
-            
+            flash("Permohonan cuti anda telah dihantar!", "success")
+            return redirect(url_for('records'))
+
         except Exception as e:
             conn.rollback()
-            flash(f"Ralat sistem: {str(e)}", "danger")
-            return redirect(url_for('apply_leave'))
+            print(f"Error: {e}")
+            flash("Gagal menghantar permohonan. Sila cuba lagi.", "danger")
         finally:
             cur.close()
             conn.close()
 
-        return redirect(url_for('records'))
+    # --- BAHAGIAN GET (MEMAPARKAN BORANG) ---
+    # 6. Ambil data user secara lengkap untuk dihantar ke apply.html
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    
+    cur.execute("""
+        SELECT e.*, m.full_name as manager_name,
+               (SELECT balance FROM get_user_balances(e.emp_id) WHERE type_id = 1) as remaining_leave
+        FROM employees e 
+        LEFT JOIN employees m ON e.manager_id = m.emp_id 
+        WHERE e.emp_id = %s
+    """, (session['user_id'],))
+    
+    user_data = cur.fetchone()
+    cur.close()
+    conn.close()
 
-    return render_template('apply.html')
+    # Pastikan 'user' dihantar untuk elakkan ralat Jinja2
+    return render_template('apply.html', user=user_data, active_page='apply')
 
 # =========================
 # VIEW RECORDS (ADD THIS)
