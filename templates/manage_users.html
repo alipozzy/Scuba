@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block title %}Employee Directory | TCK Leave{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-6 pb-16 animate-fadeIn">
+    
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
+        <div>
+            <span class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-2 block">Management</span>
+            <h1 class="text-5xl font-extrabold text-slate-900 tracking-tight">Employee Directory</h1>
+            <p class="text-slate-500 font-medium mt-2 text-lg">Manage and monitor all {{ users|length }} active employees in the system.</p>
+        </div>
+
+        <div class="flex">
+            <button onclick="openModal('add')" class="bg-slate-900 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-[1.5rem] transition-all shadow-xl shadow-slate-200 active:scale-95 text-sm flex items-center group">
+                <span class="mr-2 text-xl group-hover:rotate-90 transition-transform">+</span> 
+                Add New Employee
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white/70 backdrop-blur-2xl p-4 rounded-[2rem] border border-white mb-10 shadow-xl shadow-slate-100/50 flex flex-col md:flex-row gap-4 items-center">
+        <div class="relative flex-1 w-full">
+            <div class="absolute inset-y-0 left-5 flex items-center pointer-events-none">
+                <span class="text-slate-400">🔍</span>
+            </div>
+            <input type="text" id="searchInput" onkeyup="filterUsers()" 
+                class="w-full bg-slate-100/50 border-none focus:ring-2 focus:ring-blue-500/20 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold text-slate-700 placeholder-slate-400 transition-all" 
+                placeholder="Search by name or email...">
+        </div>
+        
+        <div class="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0 no-scrollbar">
+            <select id="roleFilter" onchange="filterUsers()" 
+                class="bg-slate-100/50 border-none focus:ring-2 focus:ring-blue-500/20 rounded-2xl py-4 px-6 text-sm font-bold text-slate-700 cursor-pointer">
+                <option value="ALL">All Roles</option>
+                <option value="Admin">Admin</option>
+                <option value="Manager">Manager</option>
+                <option value="Supervisor">Supervisor</option>
+                <option value="Staff">Staff</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-50 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse" id="userTable">
+                <thead>
+                    <tr class="bg-slate-50/50 border-b border-slate-100">
+                        <th class="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Employee</th>
+                        <th class="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Role & Department</th>
+                        <th class="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                        <th class="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em]">Joined Date</th>
+                        <th class="px-8 py-6 text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for u in users %}
+                    <tr class="hover:bg-blue-50/30 transition-colors group">
+                        <td class="px-8 py-6">
+                            <div class="flex items-center gap-4">
+                                <div class="h-12 w-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500 font-bold shadow-inner">
+                                    {{ u.full_name[0] }}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-900 name-field">{{ u.full_name }}</div>
+                                    <div class="text-xs font-medium text-slate-400 email-field">{{ u.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-8 py-6">
+                            <span class="inline-flex items-center px-3 py-1 rounded-lg bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider mb-1 role-field">
+                                {{ u.role }}
+                            </span>
+                            <div class="text-xs text-slate-500 font-semibold">{{ u.dept_name or 'No Department' }}</div>
+                        </td>
+                        <td class="px-8 py-6">
+                            {% if u.is_active %}
+                            <span class="h-2 w-2 rounded-full bg-emerald-500 inline-block mr-2 shadow-[0_0_10px_rgba(16,185,129,0.4)]"></span>
+                            <span class="text-emerald-600 font-bold text-xs">Active</span>
+                            {% else %}
+                            <span class="h-2 w-2 rounded-full bg-slate-300 inline-block mr-2"></span>
+                            <span class="text-slate-400 font-bold text-xs">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-8 py-6 text-sm font-bold text-slate-600">
+                            {{ u.joined_date }}
+                        </td>
+                        <td class="px-8 py-6 text-right">
+                            <div class="flex justify-end gap-2">
+                                <button onclick="openModal('edit', this)" data-user='{{ u|tojson|safe }}'
+                                    class="p-3 rounded-xl bg-slate-50 text-slate-400 hover:bg-blue-600 hover:text-white transition-all active:scale-90 shadow-sm">
+                                    ✏️
+                                </button>
+                                <form action="{{ url_for('delete_user', id=u.emp_id) }}" method="POST" onsubmit="return confirm('Confirm delete this employee?')">
+                                    <button class="p-3 rounded-xl bg-slate-50 text-slate-400 hover:bg-red-500 hover:text-white transition-all active:scale-90 shadow-sm">
+                                        🗑️
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    
+                    <tr id="noResultsRow" class="hidden">
+                        <td colspan="5" class="py-20 text-center">
+                            <div class="text-4xl mb-4">🤷‍♂️</div>
+                            <p class="text-slate-900 font-black text-xl">No employees found.</p>
+                            <p class="text-slate-400 font-medium">Try adjusting your search or filters.</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .animate-fadeIn { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    @keyframes fadeIn { 
+        from { opacity: 0; transform: translateY(20px); } 
+        to { opacity: 1; transform: translateY(0); } 
+    }
+</style>
+
+<script>
+    function openModal(mode, element = null) {
+        const modal = document.getElementById('userModal');
+        const title = document.getElementById('modalTitle');
+        const action = document.getElementById('formAction');
+        const submitBtn = document.getElementById('submitBtn');
+        const passContainer = document.getElementById('passwordContainer');
+        const passInput = document.getElementById('formPass');
+
+        modal.classList.remove('hidden');
+
+        if (mode === 'edit' && element) {
+            const userData = JSON.parse(element.getAttribute('data-user'));
+            
+            title.innerText = "Update Profile";
+            action.value = "edit";
+            submitBtn.innerText = "Save Changes";
+            
+            passContainer.classList.add('hidden');
+            passInput.required = false; 
+            
+            document.getElementById('formEmpId').value = userData.emp_id;
+            document.getElementById('formName').value = userData.full_name;
+            document.getElementById('formEmail').value = userData.email;
+            document.getElementById('formDept').value = userData.dept_id;
+            document.getElementById('formRole').value = userData.role;
+            document.getElementById('formManager').value = userData.manager_id || "";
+            
+            if (userData.joined_date) {
+                const date = new Date(userData.joined_date);
+                const formattedDate = date.toISOString().split('T')[0];
+                document.getElementById('formJoinDate').value = formattedDate;
+            }
+        } else {
+            title.innerText = "Add Employee";
+            action.value = "add";
+            submitBtn.innerText = "Register Employee";
+            
+            passContainer.classList.remove('hidden');
+            passInput.required = true;
+            
+            document.getElementById('formEmpId').value = "";
+            document.getElementById('formName').value = "";
+            document.getElementById('formEmail').value = "";
+            document.getElementById('formPass').value = "";
+            document.getElementById('formDept').selectedIndex = 0;
+            document.getElementById('formRole').value = "Employee";
+            document.getElementById('formManager').value = "";
+            document.getElementById('formJoinDate').value = new Date().toISOString().split('T')[0];
+        }
+    }
+
+    function closeModal() {
+        document.getElementById('userModal').classList.add('hidden');
+    }
+
+    function filterUsers() {
+        const search = document.getElementById('searchInput').value.toUpperCase();
+        const role = document.getElementById('roleFilter').value.toUpperCase();
+        const rows = document.querySelectorAll('#userTable tbody tr:not(#noResultsRow)');
+        const noResults = document.getElementById('noResultsRow');
+        let hasVisibleRows = false;
+
+        rows.forEach(row => {
+            const name = row.querySelector('.name-field').innerText.toUpperCase();
+            const email = row.querySelector('.email-field').innerText.toUpperCase();
+            const roleBadge = row.querySelector('.role-field').innerText.toUpperCase();
+
+            const matchesSearch = name.includes(search) || email.includes(search);
+            const matchesRole = (role === 'ALL') || (roleBadge.trim() === role);
+
+            if (matchesSearch && matchesRole) {
+                row.style.display = "";
+                hasVisibleRows = true;
+            } else {
+                row.style.display = "none";
+            }
+        });
+
+        if (hasVisibleRows) {
+            noResults.classList.add('hidden');
+            noResults.style.display = "none";
+        } else {
+            noResults.classList.remove('hidden');
+            noResults.style.display = "table-row";
+        }
+    }
+</script>
+{% endblock %}

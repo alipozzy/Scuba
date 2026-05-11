@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | TCK Leave</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border-t-8 border-blue-900">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-bold text-blue-900">TCK <span class="text-red-600">e-Solutions</span></h1>
+            <p class="text-gray-500 text-sm mt-2">Leave Management System</p>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+            {% for category, message in messages %}
+              <div class="mb-4 p-3 rounded bg-{{ 'red-100 text-red-700' if category == 'danger' else 'blue-100 text-blue-700' }}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          {% endif %}
+        {% endwith %}
+
+        <form action="/login" method="POST" class="space-y-6">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700">Email Address</label>
+                <input type="email" name="email" required class="w-full mt-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700">Password</label>
+                <input type="password" name="password" required 
+                class="w-full mt-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-900 outline-none">
+            </div>
+            <button type="submit" class="w-full bg-blue-900 hover:bg-blue-800 text-white font-bold py-3 rounded-lg transition duration-300 shadow-lg">
+                Sign In
+            </button>
+        </form>
+    </div>
+</body>
+</html>

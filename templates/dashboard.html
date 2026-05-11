@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | SmartLeave{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 pb-10 animate-fadeIn">
+    
+    <!-- Hero Header Section -->
+    <header class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+        <div>
+            <p class="text-[10px] font-black tracking-[0.2em] text-blue-600 uppercase mb-2">System Overview</p>
+            <h1 class="text-5xl md:text-6xl font-extrabold tracking-tighter text-slate-900 leading-tight">
+                Welcome back,<br>
+                <span class="text-slate-400">{{ session["name"] }}</span>.
+            </h1>
+        </div>
+        <div class="hidden md:block pb-2">
+            <p class="text-right text-slate-400 font-medium text-sm">
+                {{ now.strftime('%A, %d %B %Y') if now else '' }}
+            </p>
+        </div>
+    </header>
+
+    <!-- WIDGET 1: Leave Entitlement (For Staff/Manager) -->
+    {% if session["role"] != 'Admin' %}
+    <section class="mb-12">
+        <div class="flex items-center gap-3 mb-6">
+            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">01. Your Leave Balance</h2>
+            <div class="h-[1px] flex-1 bg-slate-100"></div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {% for balance in balances %}
+            <div class="bg-white/80 backdrop-blur-xl border border-white rounded-[2.5rem] p-8 shadow-2xl shadow-slate-200/50 hover:scale-[1.02] transition-all duration-500 group">
+                <div class="flex justify-between items-start mb-6">
+                    <h3 class="text-[10px] font-black uppercase tracking-widest text-slate-400">{{ balance.leave_name }}</h3>
+                    <span class="text-blue-600 opacity-0 group-hover:opacity-100 transition-opacity">→</span>
+                </div>
+                <div class="flex items-baseline gap-2">
+                    <span class="text-5xl font-black text-slate-900 tracking-tighter">{{ balance.remaining_balance }}</span>
+                    <span class="text-sm font-bold text-slate-300 uppercase tracking-widest">/ {{ balance.total_entitlement }}</span>
+                </div>
+                <p class="mt-4 text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Available Days</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- WIDGET 2: Management Tasks (Supervisor/Manager) -->
+    {% if session["role"] in ['Supervisor', 'Manager', 'Executive'] %}
+    <section class="mb-12">
+        <div class="bg-slate-900 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl shadow-slate-900/20 relative overflow-hidden">
+            <!-- Decorative Pattern -->
+            <div class="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
+            
+            <div class="relative z-10 mb-8 md:mb-0 text-center md:text-left">
+                <h2 class="text-2xl font-extrabold text-white tracking-tight">Pending Approvals</h2>
+                <p class="text-slate-400 font-medium mt-1">There are requests awaiting your technical review & signature.</p>
+            </div>
+            
+            <a href="{{ url_for('pending_approvals') }}" class="relative z-10 px-10 py-4 bg-blue-600 text-white font-black text-[11px] uppercase tracking-[0.2em] rounded-2xl hover:bg-white hover:text-slate-900 transition-all shadow-xl shadow-blue-900/40 active:scale-95">
+                Review Queue
+            </a>
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- WIDGET 3: Admin Insight (Admin Only) -->
+    {% if session["role"] == 'Admin' %}
+    <section class="mb-12">
+        <div class="flex items-center gap-3 mb-6">
+            <h2 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">System Administrator Insights</h2>
+            <div class="h-[1px] flex-1 bg-slate-100"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <!-- Personnel Card -->
+            <div class="bg-slate-900 rounded-[2.5rem] p-10 min-h-[320px] flex flex-col justify-between shadow-2xl shadow-slate-900/20">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-4">Personnel Metrics</p>
+                    <h2 class="text-3xl font-extrabold text-white tracking-tight leading-tight">Total Active<br>System Users</h2>
+                </div>
+                <div>
+                    <p class="text-8xl font-black text-white tracking-tighter">{{ stats.total_users }}</p>
+                    <p class="text-slate-500 text-[10px] font-black uppercase tracking-widest mt-4">Verified Employees</p>
+                </div>
+            </div>
+
+            <!-- Monitoring Card -->
+            <div class="bg-white/80 backdrop-blur-xl border border-white rounded-[2.5rem] p-10 min-h-[320px] flex flex-col justify-between shadow-2xl shadow-slate-200/60">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">Operations</p>
+                    <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight">System Integrity & Audit Logs</h2>
+                    <p class="text-slate-500 mt-4 text-sm font-medium leading-relaxed">Monitor real-time system changes, login attempts, and database consistency.</p>
+                </div>
+                <div class="mt-8">
+                    <a href="{{ url_for('system_logs') }}" class="inline-flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-blue-600 hover:gap-5 transition-all">
+                        Access Full Report <span>→</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+</div>
+
+<style>
+    body { background-color: #f8fafc; } /* Light slate background */
+    .animate-fadeIn { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+</style>
+{% endblock %}

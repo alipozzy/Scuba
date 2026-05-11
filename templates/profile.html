@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}My Profile | SmartLeave{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-6 pb-16 animate-fadeIn">
+    
+    <!-- Header Section: Apple-Style Hierarchy -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
+        <div>
+            <span class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-2 block">Settings</span>
+            <h1 class="text-5xl font-extrabold text-slate-900 tracking-tight">Personal Profile</h1>
+            <p class="text-slate-500 font-medium mt-2 text-lg">Manage your professional identity and emergency contact settings.</p>
+        </div>
+        
+        <button onclick="window.print()" class="bg-white/70 backdrop-blur-md border border-white text-slate-900 px-8 py-4 rounded-[1.8rem] font-black text-[11px] uppercase tracking-[0.2em] hover:bg-slate-900 hover:text-white transition-all shadow-xl shadow-slate-200/50 flex items-center gap-3 w-fit active:scale-95">
+            <span>🪪</span> Print ID Card
+        </button>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        
+        <!-- Left Column: Avatar & Security -->
+        <div class="space-y-8">
+            <!-- Profile Card -->
+            <div class="bg-white/80 backdrop-blur-2xl rounded-[3rem] border border-white p-10 text-center shadow-2xl shadow-slate-200/60 relative overflow-hidden">
+                {% if on_leave %}
+                <div class="absolute top-8 right-8 animate-pulse">
+                    <span class="bg-blue-600 text-white px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-200">On Leave</span>
+                </div>
+                {% endif %}
+
+                <div class="relative w-40 h-40 mx-auto mb-8 group">
+                    <div class="w-full h-full bg-slate-900 rounded-[3rem] flex items-center justify-center text-5xl font-black text-white overflow-hidden shadow-2xl border-4 border-white transition-transform duration-500 group-hover:scale-105">
+                        {% if user.profile_pic %}
+                            <img src="{{ url_for('static', filename='uploads/profiles/' + user.profile_pic) }}" class="w-full h-full object-cover">
+                        {% else %}
+                            {{ user.full_name[0] }}
+                        {% endif %}
+                    </div>
+                    <form action="{{ url_for('profile') }}" method="POST" enctype="multipart/form-data" class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all bg-slate-900/60 backdrop-blur-sm rounded-[3rem] cursor-pointer text-white text-[10px] font-black uppercase tracking-widest">
+                        <label for="pfp-upload" class="cursor-pointer px-4 text-center">Change Photo</label>
+                        <input type="file" id="pfp-upload" name="profile_pic" class="hidden" onchange="this.form.submit()">
+                    </form>
+                </div>
+
+                <h2 class="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">{{ user.full_name }}</h2>
+                <p class="text-blue-600 text-[11px] font-black uppercase tracking-[0.3em] mt-3 bg-blue-50 inline-block px-4 py-1.5 rounded-full">{{ user.role }}</p>
+
+                <div class="mt-10 pt-10 border-t border-slate-100 grid grid-cols-2 gap-5">
+                    <div class="bg-slate-50/50 p-5 rounded-[2rem] border border-slate-100">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Available</p>
+                        <p class="text-3xl font-black text-slate-900">{{ user.remaining_leave }}<span class="text-xs ml-1 text-slate-400 font-bold uppercase">d</span></p>
+                    </div>
+                    <div class="bg-slate-50/50 p-5 rounded-[2rem] border border-slate-100">
+                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Annual Entitlement</p>
+                        <p class="text-3xl font-black text-slate-400">{{ user.total_leave }}<span class="text-xs ml-1 font-bold uppercase">d</span></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Security Section: Dark iOS Style -->
+            <div class="bg-slate-900 rounded-[3rem] p-10 shadow-2xl shadow-slate-900/20 border border-white/5">
+                <h3 class="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mb-8">Security & Access</h3>
+                <div class="space-y-8">
+                    <div>
+                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Registered Email</span>
+                        <p class="text-white font-bold text-base truncate">{{ user.email }}</p>
+                    </div>
+                    <button onclick="toggleModal('pwModal')" class="w-full bg-white/10 text-white border border-white/10 py-5 rounded-[1.8rem] text-[10px] font-black uppercase tracking-widest hover:bg-white hover:text-slate-900 transition-all active:scale-95">
+                        Update Password
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Details & Emergency Form -->
+        <div class="lg:col-span-2 space-y-10">
+            <!-- Employment Details: Visual Grid -->
+            <div class="bg-white/80 backdrop-blur-2xl rounded-[3rem] border border-white p-10 shadow-2xl shadow-slate-200/60">
+                <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-10">01. Employment Details</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-y-10 gap-x-12">
+                    <div class="group">
+                        <span class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">Employee ID</span>
+                        <p class="font-black text-slate-900 text-xl tracking-tight">#TCK-{{ "%04d" | format(user.emp_id) }}</p>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">Department</span>
+                        <p class="font-black text-slate-900 text-xl tracking-tight">{{ user.dept_name or 'General' }}</p>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">Joined Date</span>
+                        <p class="font-black text-slate-900 text-xl tracking-tight">{{ user.joined_date or '—' }}</p>
+                    </div>
+                    <div>
+                        <span class="text-[10px] font-black text-slate-400 block mb-2 uppercase tracking-widest">Reporting To</span>
+                        <p class="font-black text-blue-600 text-xl tracking-tight">{{ user.manager_name or 'Management (HQ)' }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emergency Contact Form: Premium Inputs -->
+            <div class="bg-white/80 backdrop-blur-2xl rounded-[3rem] border border-white p-10 shadow-2xl shadow-slate-200/60">
+                <div class="flex items-center mb-10">
+                    <div class="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-xl mr-4">❤️</div>
+                    <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">02. Emergency Contact Info</h3>
+                </div>
+                
+                <form action="{{ url_for('profile') }}" method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <input type="hidden" name="action" value="update_info">
+                    
+                    <div class="md:col-span-2 space-y-3">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-4">Full Name</label>
+                        <input type="text" name="emergency_name" value="{{ user.emergency_name or '' }}" placeholder="Enter legal name"
+                            class="w-full bg-slate-50/80 border-2 border-transparent p-6 rounded-[1.8rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 transition-all">
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-4">Relationship</label>
+                        <input type="text" name="emergency_relation" value="{{ user.emergency_relation or '' }}" placeholder="e.g. Parent, Spouse"
+                            class="w-full bg-slate-50/80 border-2 border-transparent p-6 rounded-[1.8rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 transition-all">
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-4">Phone Number</label>
+                        <input type="text" name="emergency_phone" value="{{ user.emergency_phone or '' }}" placeholder="01X-XXXXXXX"
+                            class="w-full bg-slate-50/80 border-2 border-transparent p-6 rounded-[1.8rem] font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 transition-all">
+                    </div>
+                    
+                    <div class="md:col-span-2 pt-6">
+                        <button type="submit" class="w-full md:w-fit bg-blue-600 text-white px-12 py-5 rounded-[1.8rem] font-black uppercase text-[11px] tracking-[0.2em] hover:bg-blue-500 shadow-xl shadow-blue-900/20 transition-all active:scale-95">
+                            Update Details
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Password: Clean iOS Popup -->
+<div id="pwModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xl z-50 flex items-center justify-center p-6 transition-all">
+    <div class="bg-white rounded-[3rem] shadow-2xl w-full max-w-md overflow-hidden animate-fadeIn border border-white">
+        <div class="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/30">
+            <div>
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Security</h2>
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Reset System Password</p>
+            </div>
+            <button onclick="toggleModal('pwModal')" class="w-10 h-10 flex items-center justify-center bg-white rounded-full text-slate-400 hover:text-slate-900 transition-all shadow-sm active:scale-90">✕</button>
+        </div>
+        <form action="{{ url_for('profile') }}" method="POST" class="p-10 space-y-6">
+            <input type="hidden" name="action" value="change_password">
+            
+            <div class="space-y-3">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Current Password</label>
+                <input type="password" name="old_password" required class="w-full bg-slate-50 border-2 border-transparent p-6 rounded-[1.8rem] font-bold outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white transition-all">
+            </div>
+            
+            <div class="space-y-3">
+                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">New Password</label>
+                <input type="password" name="new_password" required class="w-full bg-slate-50 border-2 border-transparent p-6 rounded-[1.8rem] font-bold outline-none focus:ring-4 focus:ring-blue-500/10 focus:bg-white transition-all">
+            </div>
+
+            <button type="submit" class="w-full bg-slate-900 text-white py-6 rounded-[1.8rem] font-black uppercase tracking-[0.2em] text-[11px] hover:bg-blue-600 transition-all mt-6 shadow-xl shadow-slate-200 active:scale-95">
+                Confirm Update
+            </button>
+        </form>
+    </div>
+</div>
+
+<style>
+    .animate-fadeIn { 
+        animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+    }
+    
+    @keyframes fadeIn { 
+        from { opacity: 0; transform: translateY(30px); filter: blur(10px); } 
+        to { opacity: 1; transform: translateY(0); filter: blur(0); } 
+    }
+
+    @media print { 
+        .no-print, button, form, .bg-slate-900, label { display: none !important; } 
+        body { background: white; color: black; }
+        .max-w-7xl { padding: 0; margin: 0; }
+        .bg-white\/80 { background: white !important; border: 1px solid #eee !important; box-shadow: none !important; }
+    }
+</style>
+
+<script>
+    function toggleModal(id) {
+        const modal = document.getElementById(id);
+        modal.classList.toggle('hidden');
+    }
+    
+    // Close modal on outside click
+    window.onclick = function(event) {
+        const pwModal = document.getElementById('pwModal');
+        if (event.target == pwModal) {
+            pwModal.classList.add('hidden');
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Control Center | TCK Leave{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 pb-10">
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
+        <div>
+            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">System Administration</h1>
+            <p class="text-slate-500 font-medium mt-1">Global oversight of employees, leave status, and company structure.</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="toggleModal('addEmployeeModal')" class="bg-slate-900 text-white px-8 py-3 rounded-2xl font-black text-[13px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg shadow-slate-200">
+                ＋ Add New Employee
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div class="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-xl shadow-slate-100/50 flex items-center gap-6 group hover:border-blue-200 transition-all">
+            <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-3xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">👥</div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Employees</p>
+                <h3 class="text-4xl font-black text-slate-900">{{ total_employees }}</h3>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-xl shadow-slate-100/50 flex items-center gap-6 group hover:border-amber-200 transition-all">
+            <div class="w-16 h-16 bg-amber-50 text-amber-600 rounded-3xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">⏳</div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Global Pending</p>
+                <h3 class="text-4xl font-black text-slate-900">{{ pending_count }}</h3>
+            </div>
+        </div>
+
+        <div class="bg-white border border-slate-100 p-8 rounded-[2.5rem] shadow-xl shadow-slate-100/50 flex items-center gap-6 group hover:border-emerald-200 transition-all">
+            <div class="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform">🌴</div>
+            <div>
+                <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">On Leave Today</p>
+                <h3 class="text-4xl font-black text-slate-900">{{ on_leave_today }}</h3>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white border border-slate-100 rounded-[2.5rem] shadow-xl shadow-slate-100/50 overflow-hidden">
+        <div class="px-10 py-8 border-b border-slate-50 flex justify-between items-center">
+            <h2 class="text-xl font-black text-slate-900 tracking-tight">Recent Employee Registrations</h2>
+            <a href="{{ url_for('manage_users') }}" class="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline">View Full Directory →</a>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-slate-50/50">
+                        <th class="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee</th>
+                        <th class="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Role</th>
+                        <th class="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Department</th>
+                        <th class="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Joined Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for emp in all_employees[:5] %} <tr class="hover:bg-slate-50/50 transition-colors">
+                        <td class="px-10 py-6">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center font-black text-slate-400 text-sm">
+                                    {{ emp.full_name[0] }}
+                                </div>
+                                <div>
+                                    <div class="font-bold text-slate-900">{{ emp.full_name }}</div>
+                                    <div class="text-xs text-slate-400 font-medium">{{ emp.email }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-10 py-6">
+                            <span class="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider
+                                {% if emp.role == 'Admin' %} bg-purple-50 text-purple-600
+                                {% elif emp.role == 'Supervisor' %} bg-blue-50 text-blue-600
+                                {% else %} bg-slate-100 text-slate-600 {% endif %}">
+                                {{ emp.role }}
+                            </span>
+                        </td>
+                        <td class="px-10 py-6 text-sm font-bold text-slate-600">{{ emp.dept_name or 'Management' }}</td>
+                        <td class="px-10 py-6 text-sm font-medium text-slate-400">{{ emp.joined_date }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="addEmployeeModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
+        <div class="p-10">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-black text-slate-900 tracking-tight">Register New Personnel</h2>
+                <button onclick="toggleModal('addEmployeeModal')" class="w-10 h-10 bg-slate-50 text-slate-400 rounded-full flex items-center justify-center hover:bg-red-50 hover:text-red-500 transition-all">✕</button>
+            </div>
+
+            <form action="{{ url_for('manage_users') }}" method="POST" class="space-y-5">
+                <input type="hidden" name="action" value="add">
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div class="col-span-2">
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Full Legal Name</label>
+                        <input type="text" name="full_name" required placeholder="e.g. Ahmad Firdaus"
+                               class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 mt-1">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Email Address</label>
+                        <input type="email" name="email" required placeholder="name@tck.com"
+                               class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 mt-1">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Password </label>
+                        <input type="password" name="password" required placeholder="••••••••"
+                               class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 mt-1">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">Assign Department</label>
+                        <select name="dept_id" class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer">
+                            {% for dept in departments %}
+                            <option value="{{ dept.dept_id }}">{{ dept.dept_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase ml-2 tracking-widest">System Access Role</label>
+                        <select name="role" class="w-full bg-slate-50 border-none p-4 rounded-2xl font-bold text-sm outline-none focus:ring-2 focus:ring-blue-500 mt-1 cursor-pointer">
+                            <option value="Employee">Employee</option>
+                            <option value="Supervisor">Supervisor</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="pt-6">
+                    <button type="submit" class="w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest text-xs hover:bg-blue-700 shadow-xl shadow-blue-100 transition-all">
+                        Create Account & Send Access
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleModal(id) {
+        const modal = document.getElementById(id);
+        if (modal.classList.contains('hidden')) {
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Stop scrolling
+        } else {
+            modal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+        }
+    }
+
+    // Tutup modal bila klik luar kawasan putih
+    window.onclick = function(event) {
+        const addModal = document.getElementById('addEmployeeModal');
+        if (event.target == addModal) {
+            toggleModal('addEmployeeModal');
+        }
+    }
+</script>
+{% endblock %}

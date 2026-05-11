@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics & Reports | TCK Leave{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<div class="max-w-7xl mx-auto px-4 pb-10 animate-fadeIn">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
+        <div>
+            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">Analytics & Reports</h1>
+            <p class="text-slate-500 font-medium mt-1">Data-driven insights for organization leave trends.</p>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="window.print()" class="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-bold py-3 px-6 rounded-2xl transition-all shadow-sm active:scale-95 text-sm flex items-center">
+                <span class="mr-2">📄</span> Export PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        <div class="bg-white/60 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white shadow-xl shadow-blue-900/5">
+            <p class="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Total Approved Leaves</p>
+            <h2 class="text-4xl font-black text-slate-900">{{ stats.total_approved if stats else 0 }}</h2>
+            <p class="text-xs text-slate-400 mt-2 font-medium">Accumulated this year</p>
+        </div>
+        
+        <div class="bg-white/60 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white shadow-xl shadow-blue-900/5">
+            <p class="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-2">Most Taken Type</p>
+            <h2 class="text-3xl font-black text-slate-900">{{ stats.top_type if stats else 'N/A' }}</h2>
+            <p class="text-xs text-slate-400 mt-2 font-medium">Based on frequency</p>
+        </div>
+
+        <div class="bg-white/60 backdrop-blur-xl p-8 rounded-[2.5rem] border border-white shadow-xl shadow-blue-900/5">
+            <p class="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2">Pending Actions</p>
+            <h2 class="text-4xl font-black text-slate-900">{{ stats.total_pending if stats else 0 }}</h2>
+            <p class="text-xs text-slate-400 mt-2 font-medium">Requiring immediate review</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div class="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50">
+            <h3 class="text-xl font-black text-slate-900 mb-8 flex items-center">
+                <span class="mr-3">📊</span> Leave Distribution
+            </h3>
+            <div class="h-[300px] flex justify-center">
+                <canvas id="leaveTypeChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-[3rem] p-10 border border-slate-100 shadow-2xl shadow-slate-200/50">
+            <h3 class="text-xl font-black text-slate-900 mb-8 flex items-center">
+                <span class="mr-3">📈</span> Monthly Trend
+            </h3>
+            <div class="h-[300px]">
+                <canvas id="monthlyTrendChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Leave Distribution Data (Pie Chart)
+    const ctxPie = document.getElementById('leaveTypeChart').getContext('2d');
+    new Chart(ctxPie, {
+        type: 'doughnut',
+        data: {
+            labels: ['Annual', 'Medical', 'Emergency', 'Other'],
+            datasets: [{
+                data: [45, 25, 15, 15], // Gantikan dengan data dari Flask {{ chart_data }}
+                backgroundColor: ['#2563eb', '#10b981', '#f43f5e', '#94a3b8'],
+                borderWidth: 0,
+                hoverOffset: 20
+            }]
+        },
+        options: {
+            cutout: '70%',
+            plugins: {
+                legend: { position: 'bottom', labels: { usePointStyle: true, padding: 25, font: { weight: 'bold' } } }
+            }
+        }
+    });
+
+    // 2. Monthly Trend Data (Line Chart)
+    const ctxLine = document.getElementById('monthlyTrendChart').getContext('2d');
+    new Chart(ctxLine, {
+        type: 'line',
+        data: {
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [{
+                label: 'Leaves Taken',
+                data: [12, 19, 15, 8, 22, 30], // Gantikan dengan data dari Flask
+                borderColor: '#2563eb',
+                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointBackgroundColor: '#fff',
+                pointBorderWidth: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { beginAtZero: true, grid: { display: false } },
+                x: { grid: { display: false } }
+            },
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+</script>
+
+<style>
+    @media print {
+        .glass-nav, button { display: none !important; }
+        body { background: white; }
+        .bg-white\/60 { background: white !important; border: 1px solid #eee; }
+    }
+</style>
+{% endblock %}

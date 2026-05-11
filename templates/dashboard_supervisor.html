@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Supervisor Dashboard | TCK Leave{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 pb-10 animate-fadeIn">
+    
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+        <div>
+            <h1 class="text-4xl font-extrabold text-slate-900 tracking-tight">
+                Hello, {{ supervisor.full_name.split()[0] if supervisor else 'Supervisor' }}!
+            </h1>
+            <p class="text-slate-500 font-medium mt-1">
+                Review and manage your team's leave requests for today, <span class="text-slate-900 font-bold">{{ today.strftime('%d %B %Y') }}</span>.
+            </p>
+        </div>
+        <div class="flex gap-3">
+            <a href="/admin/approvals" class="bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-2xl transition-all shadow-lg shadow-blue-200 active:scale-95 text-sm flex items-center group">
+                <span class="mr-2 text-lg group-hover:rotate-12 transition-transform">⚖️</span> Review Approvals
+            </a>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+        <div class="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden group">
+            <div class="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all"></div>
+            <p class="text-[10px] font-black uppercase tracking-[0.2em] opacity-50 mb-2">Management</p>
+            <h2 class="text-2xl font-bold leading-tight">{{ supervisor.full_name if supervisor else 'Supervisor Name' }}</h2>
+            <div class="mt-6 inline-flex items-center bg-white/10 px-4 py-2 rounded-xl backdrop-blur-md">
+                <span class="text-xs font-bold">{{ job_title if job_title else 'Senior Supervisor' }}</span>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl shadow-slate-100/50">
+            <div class="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-xl mb-6">⏳</div>
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pending Review</p>
+            <h3 class="text-3xl font-black text-slate-900 mt-1">{{ pending_count if pending_count else '0' }}</h3>
+            <p class="text-xs text-slate-400 mt-2 font-medium">Needs your attention</p>
+        </div>
+
+        <div class="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl shadow-slate-100/50">
+            <div class="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-xl mb-6">🌴</div>
+            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">On Leave Today</p>
+            <h3 class="text-3xl font-black text-slate-900 mt-1">{{ on_leave_today if on_leave_today else '0' }}</h3>
+            <p class="text-xs text-slate-400 mt-2 font-medium">Out of office</p>
+        </div>
+
+        <div class="bg-blue-600 rounded-[2.5rem] p-8 text-white shadow-xl shadow-blue-100">
+            <div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-xl mb-6">
+                🏢
+            </div>
+            <p class="text-[10px] font-black opacity-60 uppercase tracking-widest">Total Workforce</p>
+            
+            <h3 class="text-3xl font-black mt-1 truncate">
+                {{ team_count if team_count is not none else '0' }}
+            </h3>
+            
+            <p class="text-xs opacity-60 mt-2 font-medium tracking-wide">Active Nodes</p>
+        </div>
+
+        
+    </div>
+
+    <div class="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
+        <div class="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+            <div>
+                <h3 class="text-xl font-bold text-slate-900">Recent Team Activity</h3>
+                <p class="text-sm text-slate-500 font-medium">Latest leave updates from your department</p>
+            </div>
+            <a href="/admin/approvals" class="text-xs font-black text-blue-600 uppercase tracking-widest hover:text-blue-700 transition-colors">
+                View All Requests →
+            </a>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full border-collapse">
+                <thead>
+                    <tr>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Employee</th>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Leave Type</th>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Duration</th>
+                        <th class="px-8 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Date</th>
+                        <th class="px-8 py-5 text-center text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for leave in recent_requests %}
+                    <tr class="hover:bg-slate-50/80 transition-all group">
+                        <td class="px-8 py-5">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-500 text-xs border-2 border-white shadow-sm">
+                                    {{ leave.full_name[:2].upper() }}
+                                </div>
+                                <div>
+                                    <p class="text-sm font-bold text-slate-900">{{ leave.full_name }}</p>
+                                    <p class="text-[10px] text-slate-400 font-medium uppercase tracking-tighter">{{ leave.role }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="px-8 py-5 text-sm font-bold text-slate-700">
+                            {{ leave.leave_type }}
+                        </td>
+                        <td class="px-8 py-5">
+                            <span class="text-sm font-black text-slate-900">{{ leave.duration }}</span>
+                            <span class="text-[10px] text-slate-400 font-bold uppercase ml-1">Days</span>
+                        </td>
+                        <td class="px-8 py-5 text-sm text-slate-500 font-medium">
+                            {{ leave.start_date.strftime('%d/%m/%Y') if leave.start_date else 'N/A' }}
+                        </td>
+                        <td class="px-8 py-5 text-center">
+                            {% if leave.status == 'Approved' %}
+                                <span class="inline-flex items-center bg-emerald-50 text-emerald-600 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">
+                                    <span class="w-1.5 h-1.5 bg-emerald-600 rounded-full mr-2"></span>Approved
+                                </span>
+                            {% elif leave.status == 'Rejected' %}
+                                <span class="inline-flex items-center bg-rose-50 text-rose-600 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-rose-100">
+                                    <span class="w-1.5 h-1.5 bg-rose-600 rounded-full mr-2"></span>Rejected
+                                </span>
+                            {% else %}
+                                <a href="/admin/approvals" class="inline-flex items-center bg-amber-50 text-amber-600 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest animate-pulse border border-amber-100 hover:bg-amber-100 transition-all group-hover:scale-105">
+                                    ⚡ Action Required
+                                </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="text-center py-24">
+                            <div class="text-5xl mb-4">✨</div>
+                            <p class="text-slate-900 font-black text-lg">Your team is all caught up!</p>
+                            <p class="text-slate-400 text-sm font-medium">New requests from your department will appear here.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Premium Animation */
+    .animate-fadeIn {
+        animation: fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Custom Scrollbar for x-overflow */
+    .overflow-x-auto::-webkit-scrollbar { height: 6px; }
+    .overflow-x-auto::-webkit-scrollbar-track { background: #f8fafc; }
+    .overflow-x-auto::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+</style>
+{% endblock %}

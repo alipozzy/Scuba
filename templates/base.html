@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TCK Leave{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+            background-attachment: fixed;
+            color: #1e293b;
+        }
+
+        /* Apple Glassmorphism Nav */
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        /* Dropdown Core Styling */
+        .dropdown-content {
+            opacity: 0;
+            visibility: hidden;
+            position: absolute;
+            top: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            min-width: 220px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+            border-radius: 1.25rem;
+            z-index: 100;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            margin-top: 8px;
+            padding: 0.5rem;
+            transform: translateY(-10px);
+            transition: all 0.2s ease-in-out;
+        }
+
+        .dropdown::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 0;
+            width: 100%;
+            height: 15px;
+        }
+
+        .dropdown:hover .dropdown-content {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <nav class="glass-nav sticky top-0 z-50">
+        <div class="container mx-auto px-6 h-16 flex items-center justify-between">
+            
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 bg-black rounded-lg flex items-center justify-center shadow-md">
+                    <span class="text-white text-[10px] font-black italic">T</span>
+                </div>
+                <span class="text-xl font-bold tracking-tight text-slate-900">TCK Leave</span>
+            </div>
+
+            <div class="hidden md:flex bg-slate-200/50 p-1 rounded-2xl space-x-1 border border-slate-300/20">
+                
+                <a href="/dashboard" class="px-5 py-1.5 rounded-xl text-sm font-semibold transition-all 
+                    {% if active_page == 'dashboard' %} bg-white shadow-sm text-blue-600 {% else %} text-slate-600 hover:text-slate-900 {% endif %}">
+                    Overview
+                </a>
+
+                <div class="relative dropdown">
+                    <button class="px-5 py-1.5 rounded-xl text-sm font-semibold flex items-center space-x-1 transition-all
+                        {% if active_page in ['apply', 'records'] %} text-blue-600 bg-white shadow-sm {% else %} text-slate-600 hover:text-slate-900 {% endif %}">
+                        <span>Leave</span>
+                        <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    
+                    <div class="dropdown-content left-0 shadow-xl">
+                        <a href="/apply" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'apply' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            Apply Leave
+                        </a>
+                        
+                        <a href="/records" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'records' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            My Leave History
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Peranan Manager/Executive/CTO/COO -->
+                {% if session.get('role') in ['Manager', 'SV', 'CTO', 'COO', 'Supervisor', 'Executive', 'Admin'] %}
+                <div class="relative dropdown">
+                    <button class="px-5 py-1.5 rounded-xl text-sm font-semibold flex items-center space-x-1 transition-all
+                        {% if active_page in ['pending_approvals', 'team_history', 'team_calendar', 'reports'] %} text-blue-600 bg-white shadow-sm {% else %} text-slate-600 hover:text-slate-900 {% endif %}">
+                        <span>Team</span>
+                        <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="dropdown-content left-0 shadow-xl">
+                        <a href="{{ url_for('pending_approvals') }}" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'approvals' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            Pending Approvals
+                        </a>
+                        
+                        <a href="{{ url_for('team_history') }}" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'team_history' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            Team Records History
+                        </a>
+                        
+                        <a href="{{ url_for('team_calendar') }}" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'team_calendar' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            Team Calendar
+                        </a>
+
+                        <div class="border-t border-slate-100 my-1"></div>
+                        <a href="{{ url_for('reports') }}" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'reports' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            Analytics & Reports
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Peranan Admin Sahaja -->
+                {% if session.get('role') in ['admin', 'Admin'] %}
+                <div class="relative dropdown">
+                    <button class="px-5 py-1.5 rounded-xl text-sm font-semibold flex items-center space-x-1 transition-all
+                        {% if active_page in ['manage_users', 'manage_departments', 'system_logs'] %} text-blue-600 bg-white shadow-sm {% else %} text-slate-600 hover:text-slate-900 {% endif %}">
+                        <span>System</span>
+                        <svg class="w-4 h-4 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </button>
+                    <div class="dropdown-content left-0 shadow-xl">
+                        <a href="{{ url_for('manage_users') }}" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'manage_users' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            Manage Users
+                        </a>
+                        <a href="{{ url_for('manage_departments') }}" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'manage_departments' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            Department Settings
+                        </a>
+                        <a href="{{ url_for('system_logs') }}" class="block px-4 py-2.5 text-sm font-medium rounded-lg transition
+                            {% if active_page == 'system_logs' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
+                            System Logs
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Avatar & Profile Section (FIXED: Undefined Error) -->
+            <div class="flex items-center space-x-6">
+                <div class="relative dropdown">
+                    <button class="flex items-center space-x-3 focus:outline-none group">
+                        <div class="text-right hidden sm:block">
+                            <p class="text-xs font-bold text-slate-900 leading-none">
+                                {{ session.get('name', 'User') }}
+                            </p>
+                            <p class="text-[10px] text-slate-400 font-medium uppercase mt-1 tracking-tighter">
+                                {{ session.get('role', 'Staff') }}
+                            </p>
+                        </div>
+                        <div class="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 flex items-center justify-center text-white text-sm font-bold shadow-md group-hover:scale-105 transition-transform">
+                            {% if session.get('full_name') %}
+                                {{ session['full_name'][0] | upper }}
+                            {% else %}
+                                ?
+                            {% endif %}
+                        </div>
+                    </button>
+                    
+                    <div class="dropdown-content right-0 shadow-2xl shadow-blue-900/10">
+                        <a href="/profile" class="block px-4 py-3 text-sm font-medium rounded-lg transition flex items-center
+                            {% if active_page == 'profile' %} bg-slate-200 text-slate-900 {% else %} text-slate-700 hover:bg-slate-100 {% endif %}">
+                            <span class="mr-2">👤</span> My Profile
+                        </a>
+                        <div class="border-t border-slate-100 my-1"></div>
+                        <a href="/logout" class="block px-4 py-3 text-sm font-bold text-red-600 hover:bg-red-50 rounded-lg transition flex items-center">
+                            <span class="mr-2">🚪</span> Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto py-8 px-6">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="py-10 text-center text-slate-400 text-[10px] font-medium">
+        &copy; 2026 TCK e-Solutions. <br>
+        <span class="opacity-50 tracking-widest uppercase">TCK Leave Application System</span>
+    </footer>
+
+</body>
+</html>

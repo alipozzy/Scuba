@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Team Records History | TCK Leave{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-6 pb-16 animate-fadeIn">
+    
+    <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
+        <div>
+            <span class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-2 block">Management</span>
+            <h1 class="text-5xl font-extrabold text-slate-900 tracking-tight">Team History</h1>
+            <p class="text-slate-500 font-medium mt-2 text-lg">Full audit trail of all leave applications in your department.</p>
+        </div>
+
+        <div class="flex">
+            <button onclick="window.print()" class="bg-white hover:bg-slate-50 text-slate-900 border border-slate-200 font-bold py-4 px-8 rounded-[1.5rem] transition-all shadow-xl shadow-slate-200 active:scale-95 text-sm flex items-center group">
+                <span class="mr-3 transition-transform group-hover:scale-125">🖨️</span> 
+                Print Report
+            </button>
+        </div>
+    </div>
+
+    <div class="bg-white/70 backdrop-blur-2xl p-3 rounded-[2.5rem] border border-white mb-10 shadow-2xl shadow-slate-200/50 flex flex-col lg:flex-row gap-3">
+        <div class="relative flex-1 group">
+            <span class="absolute left-6 top-1/2 -translate-y-1/2 opacity-20 group-focus-within:opacity-100 transition-opacity">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </span>
+            <input type="text" id="teamSearch" onkeyup="filterTeamTable()" placeholder="Search staff name or department..." 
+                class="w-full pl-14 pr-6 py-4 bg-white/50 border-none rounded-[1.8rem] focus:ring-4 focus:ring-blue-500/10 transition-all font-semibold text-slate-700 placeholder:text-slate-300">
+        </div>
+        
+        <div class="flex bg-slate-100/50 p-1.5 rounded-[2rem] overflow-x-auto no-scrollbar">
+            <button onclick="setFilter('ALL')" class="filter-btn px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all active-filter">All Status</button>
+            <button onclick="setFilter('APPROVED')" class="filter-btn px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-600">Approved</button>
+            <button onclick="setFilter('PENDING')" class="filter-btn px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-600">Pending</button>
+            <button onclick="setFilter('REJECTED')" class="filter-btn px-8 py-3 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest text-slate-400 transition-all hover:text-slate-600">Rejected</button>
+        </div>
+    </div>
+
+    <div class="bg-white/80 backdrop-blur-xl rounded-[3rem] border border-white shadow-2xl shadow-slate-200/60 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse" id="teamTable">
+                <thead>
+                    <tr class="bg-slate-50/40 border-b border-slate-100/50">
+                        <th class="py-7 px-10 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Employee</th>
+                        <th class="py-7 px-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Leave Details</th>
+                        <th class="py-7 px-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Duration</th>
+                        <th class="py-7 px-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em]">Status</th>
+                        <th class="py-7 px-10 text-[10px] font-black text-slate-400 uppercase tracking-[0.25em] text-right">Document</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                    {% for record in history %}
+                    <tr class="hover:bg-slate-50/80 transition-all duration-300 group cursor-default">
+                        <td class="py-7 px-10">
+                            <div class="flex items-center gap-4">
+                                <div class="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600 rounded-2xl flex items-center justify-center font-black text-xs border border-white shadow-sm transition-transform group-hover:scale-110">
+                                    {{ record.full_name[:2]|upper }}
+                                </div>
+                                <div>
+                                    <p class="text-base font-bold text-slate-900 tracking-tight">{{ record.full_name }}</p>
+                                    <p class="text-[10px] text-blue-600 font-black uppercase tracking-widest mt-0.5">{{ record.dept_name }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-7 px-8">
+                            <div class="flex items-center gap-2 mb-1">
+                                <div class="w-2 h-2 rounded-full {% if 'Medical' in record.leave_type %} bg-rose-500 {% elif 'Emergency' in record.leave_type %} bg-orange-500 {% else %} bg-blue-500 {% endif %}"></div>
+                                <span class="font-bold text-slate-800 text-sm">{{ record.leave_type }}</span>
+                            </div>
+                            <p class="text-[11px] font-bold text-slate-400 font-mono">
+                                {{ record.start_date.strftime('%d %b %Y') }} — {{ record.end_date.strftime('%d %b %Y') }}
+                            </p>
+                        </td>
+                        <td class="py-7 px-8">
+                            <span class="bg-white border border-slate-100 text-slate-900 px-4 py-2 rounded-2xl text-xs font-black shadow-sm">
+                                {{ record.duration|int if record.duration % 1 == 0 else record.duration }} DAYS
+                            </span>
+                        </td>
+                        <td class="py-7 px-8">
+                            {% if record.status == 'Approved' %}
+                                <span class="bg-emerald-50 text-emerald-600 px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-emerald-100/50 inline-flex items-center">
+                                    <span class="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-2 animate-pulse"></span>
+                                    Approved
+                                </span>
+                            {% elif record.status == 'Pending' %}
+                                <span class="bg-amber-50 text-amber-600 px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-amber-100/50 inline-flex items-center">
+                                    <span class="w-1.5 h-1.5 bg-amber-500 rounded-full mr-2"></span>
+                                    Pending
+                                </span>
+                            {% else %}
+                                <span class="bg-rose-50 text-rose-600 px-5 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-rose-100/50 inline-flex items-center">
+                                    <span class="w-1.5 h-1.5 bg-rose-500 rounded-full mr-2"></span>
+                                    Rejected
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="py-7 px-10 text-right">
+                            {% if record.mc_path %}
+                            <a href="{{ url_for('static', filename='uploads/mc_docs/' + record.mc_path) }}" target="_blank" 
+                               class="inline-flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-600 transition-all active:scale-95 shadow-lg shadow-slate-200">
+                                📄 View File
+                            </a>
+                            {% else %}
+                            <span class="text-[10px] font-black text-slate-300 uppercase tracking-widest">No Document</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" class="py-32 text-center">
+                            <div class="flex flex-col items-center">
+                                <div class="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mb-6 border border-white shadow-inner">
+                                    <span class="text-4xl grayscale">📜</span>
+                                </div>
+                                <p class="text-slate-900 font-black uppercase tracking-[0.3em] text-xs">No History Records</p>
+                                <p class="text-slate-400 mt-2 font-medium">All completed leave applications will appear here.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentStatusFilter = 'ALL';
+
+    function setFilter(value) {
+        currentStatusFilter = value;
+        
+        // Update UI Active State
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.classList.remove('active-filter', 'bg-white', 'text-slate-900', 'shadow-sm', 'shadow-slate-200');
+            btn.classList.add('text-slate-400');
+            if(btn.innerText.trim().toUpperCase() === value.toUpperCase()) {
+                btn.classList.add('active-filter', 'bg-white', 'text-slate-900', 'shadow-sm', 'shadow-slate-200');
+                btn.classList.remove('text-slate-400');
+            }
+        });
+
+        filterTeamTable();
+    }
+
+    function filterTeamTable() {
+        const searchInput = document.getElementById("teamSearch").value.toUpperCase();
+        const rows = document.querySelectorAll("#teamTable tbody tr");
+
+        rows.forEach(row => {
+            if (row.cells.length < 5) return;
+            
+            const nameText = row.cells[0].textContent.toUpperCase();
+            const statusText = row.cells[3].textContent.toUpperCase();
+            
+            const matchesSearch = nameText.includes(searchInput);
+            const matchesFilter = (currentStatusFilter === 'ALL') || statusText.includes(currentStatusFilter.toUpperCase());
+
+            if (matchesSearch && matchesFilter) {
+                row.style.display = "";
+                row.style.opacity = "0";
+                setTimeout(() => { row.style.opacity = "1"; row.style.transition = "opacity 0.4s ease"; }, 10);
+            } else {
+                row.style.display = "none";
+            }
+        });
+    }
+</script>
+
+<style>
+    .animate-fadeIn { 
+        animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+    }
+    
+    @keyframes fadeIn { 
+        from { opacity: 0; transform: translateY(30px); filter: blur(10px); } 
+        to { opacity: 1; transform: translateY(0); filter: blur(0); } 
+    }
+
+    .active-filter { 
+        background: white !important; 
+        color: #0f172a !important; 
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    #teamTable tbody tr {
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    @media print {
+        .bg-white\/70, button, .filter-btn, #teamSearch, .shadow-2xl, .shadow-xl { display: none !important; }
+        .bg-white\/80 { background: white !important; border: 1px solid #e2e8f0 !important; }
+        .max-w-7xl { max-width: 100% !important; padding: 0 !important; }
+        body { background: white !important; }
+    }
+</style>
+{% endblock %}
