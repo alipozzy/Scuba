@@ -9,7 +9,7 @@ from flask import Flask, render_template, request, redirect, url_for, session, f
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import text  # <--- Tambah ini
+from sqlalchemy import text  
 
 app = Flask(__name__)
 app.permanent_session_lifetime = timedelta(minutes=30)
@@ -21,7 +21,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:12345@localhost:5
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Inisialisasi objek 'db'
-db = SQLAlchemy(app) # <--- Sini punca ralat tadi (perlu define db)
+db = SQLAlchemy(app) 
 
 UPLOAD_FOLDER = "static/uploads/mc_docs"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -142,9 +142,28 @@ def calculate_duration(start_date, end_date, is_half_day):
 # HELPER: LOGGING
 # =========================
 def log_action(emp_id, action, details):
-    ip = request.remote_addr # Dapatkan IP automatik dari Flask
-    query = "INSERT INTO system_logs (emp_id, action, details, ip_address) VALUES (%s, %s, %s, %s)"
-    # Jalankan database execution di sini
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        ip = request.remote_addr
+
+        query = """
+        INSERT INTO system_logs (emp_id, action, details, ip_address)
+        VALUES (%s, %s, %s, %s)
+        """
+
+        cur.execute(query, (emp_id, action, details, ip))
+        conn.commit()
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Log Error: {e}")
+
+    finally:
+        cur.close()
+        conn.close()
+
 
 
 # =========================
@@ -152,52 +171,56 @@ def log_action(emp_id, action, details):
 # =========================
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    # Jika pengguna sudah login (kita guna 'user_id' sebagai penanda aras),
-    # terus hantar ke dashboard untuk elakkan loop.
-    if 'user_id' in session:
+    if 'emp_id' in session:
         return redirect(url_for("dashboard"))
 
     if request.method == "POST":
         email = request.form.get("email")
         password_form = request.form.get("password")
 
-        # Gunakan helper connection anda
         conn = get_db_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
         try:
-            # 1. Cari user aktif berdasarkan email
-            cur.execute("SELECT * FROM employees WHERE email=%s AND is_active = TRUE", (email,))
+            cur.execute(
+                "SELECT * FROM employees WHERE email=%s AND is_active = TRUE",
+                (email,)
+            )
             user = cur.fetchone()
 
-            # 2. Semak password hash
             if user and check_password_hash(user["password_hash"], password_form):
-                # --- TETAPKAN DATA SESI (WAJIB KONSISTEN) ---
-                # Gunakan 'user_id' kerana route lain (Dashboard/Apply) mencari kunci ini
-                session["user_id"] = user["emp_id"]
+
+                # =========================
+                # FIXED SESSION
+                # =========================
+                session["emp_id"] = user["emp_id"]
                 session["name"] = user["full_name"]
                 session["role"] = user["role"] if user["role"] else "Staff"
                 session["dept_id"] = user["dept_id"]
-                
-                # Memastikan sesi kekal selama 30 minit (ikut config timedelta anda)
-                session.permanent = True 
 
-                # Rekod aktiviti login berjaya
-                record_activity('LOGIN_SUCCESS', f'User {email} logged in successfully', user["emp_id"])
+                session.permanent = True
 
-                cur.close()
-                conn.close()
+                record_activity(
+                    'LOGIN_SUCCESS',
+                    f'User {email} logged in successfully',
+                    user["emp_id"]
+                )
+
                 return redirect(url_for("dashboard"))
 
-            # 3. Jika login gagal
             if user:
-                record_activity('LOGIN_FAILED', f'Failed login attempt for {email}', user["emp_id"])
-            
+                record_activity(
+                    'LOGIN_FAILED',
+                    f'Failed login attempt for {email}',
+                    user["emp_id"]
+                )
+
             flash("E-mel atau kata laluan salah / Akaun tidak aktif.", "danger")
 
         except Exception as e:
             print(f"Database Error: {e}")
             flash("Ralat teknikal berlaku semasa login.", "danger")
+
         finally:
             cur.close()
             conn.close()
@@ -206,77 +229,81 @@ def login():
 
 
 # =========================
-# DASHBOARD (FIXED SESSION & DB)
+# DASHBOARD
 # =========================
 @app.route("/dashboard")
 def dashboard():
-    # 1. Semak Sesi (Wajib guna 'user_id' untuk elakkan Redirect Loop)
-    if 'user_id' not in session:
+    if 'emp_id' not in session:
         return redirect(url_for("login"))
 
-    emp_id = session['user_id']
+    emp_id = session['emp_id']
+
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     try:
-        # 2. Ambil Maklumat Ringkas Staf & Jabatan
         cur.execute("""
-            SELECT e.full_name, e.role, d.dept_name 
+            SELECT e.full_name, e.role, d.dept_name
             FROM employees e
             LEFT JOIN departments d ON e.dept_id = d.dept_id
             WHERE e.emp_id = %s
         """, (emp_id,))
         user_info = cur.fetchone()
 
-        # 3. Ambil Statistik Cuti (Ringkasan di Dashboard)
-        # Menghitung jumlah permohonan mengikut status
         cur.execute("""
-            SELECT 
-                COUNT(*) FILTER (WHERE status = 'Pending') as pending_count,
-                COUNT(*) FILTER (WHERE status = 'Approved') as approved_count,
-                COUNT(*) FILTER (WHERE status = 'Rejected') as rejected_count
-            FROM leave_requests 
-            WHERE emp_id = %s
+            SELECT
+                COUNT(*) FILTER (WHERE status='Pending') AS pending_count,
+                COUNT(*) FILTER (WHERE status='Approved') AS approved_count,
+                COUNT(*) FILTER (WHERE status='Rejected') AS rejected_count
+            FROM leave_requests
+            WHERE emp_id=%s
         """, (emp_id,))
         stats = cur.fetchone()
 
-        # 4. Ambil Baki Cuti Terkini (Guna helper function jika ada, atau query terus)
-        # Contoh query untuk baki cuti tahunan (Annual Leave ID: 1)
         cur.execute("""
-            SELECT eb.total_entitlement - eb.used_days as balance
-            FROM employee_balances eb
-            WHERE eb.emp_id = %s AND eb.leave_type_id = 1
+            SELECT 
+                COALESCE(total_entitlement - used_days, 0) AS balance
+            FROM employee_balances
+            WHERE emp_id=%s AND leave_type_id=1
         """, (emp_id,))
         annual_balance = cur.fetchone()
 
-        # 5. Ambil Permohonan Terkini (Top 5)
         cur.execute("""
-            SELECT lr.*, lt.leave_name 
+            SELECT 
+                lr.*,
+                lt.leave_name
             FROM leave_requests lr
-            JOIN leave_types lt ON lr.leave_type_id = lt.type_id
-            WHERE lr.emp_id = %s
+            JOIN leave_types lt
+                ON lr.leave_type_id = lt.type_id
+            WHERE lr.emp_id=%s
             ORDER BY lr.created_at DESC
             LIMIT 5
         """, (emp_id,))
         recent_requests = cur.fetchall()
 
     except Exception as e:
-        print(f"Error fetching dashboard data: {e}")
-        flash("Ralat memuatkan data dashboard.", "danger")
-        stats = {'pending_count': 0, 'approved_count': 0, 'rejected_count': 0}
+        print(f"Dashboard Error: {e}")
+
+        stats = {
+            'pending_count': 0,
+            'approved_count': 0,
+            'rejected_count': 0
+        }
+
         annual_balance = {'balance': 0}
         recent_requests = []
+        user_info = None
+
     finally:
         cur.close()
         conn.close()
 
-    # Hantar semua data ke template dashboard.html
     return render_template(
-        "dashboard.html", 
-        stats=stats, 
+        "dashboard.html",
+        stats=stats,
         recent_requests=recent_requests,
         annual_balance=annual_balance['balance'] if annual_balance else 0,
-        user_info=user_info
+        user_info=user_info, active_page='dashboard'
     )
 
 # =========================
@@ -285,7 +312,7 @@ def dashboard():
 @app.route('/apply', methods=['GET', 'POST'])
 def apply_leave():
     # 1. Semak Sesi (Guna 'user_id' untuk konsistensi dengan login)
-    if 'user_id' not in session:
+    if 'emp_id' not in session:
         flash("Sila login terlebih dahulu.", "warning")
         return redirect(url_for('login'))
 
@@ -309,7 +336,7 @@ def apply_leave():
 
         try:
             # 4. Ambil Approver ID (Manager) berdasarkan dept_id pengguna
-            cur.execute("SELECT manager_id FROM employees WHERE emp_id = %s", (session['user_id'],))
+            cur.execute("SELECT manager_id FROM employees WHERE emp_id = %s", (session['emp_id'],))
             user_info = cur.fetchone()
             approver_id = user_info['manager_id'] if user_info else None
 
@@ -320,7 +347,7 @@ def apply_leave():
                     reason, status, approver_id, duration, is_half_day
                 ) VALUES (%s, %s, %s, %s, %s, 'Pending', %s, %s, %s)
             """, (
-                session['user_id'], leave_type_id, start_date, end_date, 
+                session['emp_id'], leave_type_id, start_date, end_date, 
                 reason, approver_id, duration, is_half_day
             ))
 
@@ -338,22 +365,43 @@ def apply_leave():
 
     # --- BAHAGIAN GET (MEMAPARKAN BORANG) ---
     # 6. Ambil data user secara lengkap untuk dihantar ke apply.html
+    # --- BAHAGIAN GET (MEMAPARKAN BORANG) ---
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     
+    # Query ini menggunakan LEFT JOIN biasa, tidak perlu fungsi di PostgreSQL
     cur.execute("""
-        SELECT e.*, m.full_name as manager_name,
-               (SELECT balance FROM get_user_balances(e.emp_id) WHERE type_id = 1) as remaining_leave
-        FROM employees e 
-        LEFT JOIN employees m ON e.manager_id = m.emp_id 
-        WHERE e.emp_id = %s
-    """, (session['user_id'],))
+                    SELECT 
+                        e.*,
+                        m.full_name AS manager_name,
+
+                        (
+                            COALESCE(lt.default_entitlement, 14)
+                            -
+                            COALESCE((
+                                SELECT SUM(lr.duration)
+                                FROM leave_requests lr
+                                WHERE lr.emp_id = e.emp_id
+                                AND lr.leave_type_id = 1
+                                AND lr.status = 'Approved'
+                            ), 0)
+                        ) AS remaining_leave
+
+                    FROM employees e
+
+                    LEFT JOIN employees m
+                        ON e.manager_id = m.emp_id
+
+                    LEFT JOIN leave_types lt
+                        ON lt.type_id = 1
+
+                    WHERE e.emp_id = %s
+                """, (session['emp_id'],))
     
     user_data = cur.fetchone()
     cur.close()
     conn.close()
 
-    # Pastikan 'user' dihantar untuk elakkan ralat Jinja2
     return render_template('apply.html', user=user_data, active_page='apply')
 
 # =========================
@@ -542,10 +590,11 @@ def pending_approvals():
                            active_page='pending_approvals')
 
 # =========================
-# TEAM CALENDAR (FIXED SESSION & DB)
+# TEAM CALENDAR
+# =========================
 @app.route("/team-calendar")
 def team_calendar():
-    # Kawalan Keselamatan: Hanya pengurusan & admin boleh lihat kalendar pasukan
+
     if 'emp_id' not in session or session.get('role') == 'Staff':
         flash("Anda tidak mempunyai kebenaran untuk akses halaman ini.", "danger")
         return redirect(url_for("dashboard"))
@@ -554,51 +603,56 @@ def team_calendar():
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     try:
-        # Ambil semua cuti yang telah diluluskan untuk dipaparkan di kalendar
         cur.execute("""
-            SELECT 
+            SELECT
                 e.full_name,
-                lr.leave_type,
+                lt.leave_name,
                 lr.start_date,
                 lr.end_date,
                 lr.status
             FROM leave_requests lr
-            JOIN employees e ON lr.emp_id = e.emp_id
+            JOIN employees e
+                ON lr.emp_id = e.emp_id
+            JOIN leave_types lt
+                ON lr.leave_type_id = lt.type_id
             WHERE lr.status = 'Approved'
         """)
+
         rows = cur.fetchall()
 
-        # Tukar format data untuk FullCalendar
         events = []
+
         for row in rows:
             events.append({
                 'title': row['full_name'],
                 'start': row['start_date'].isoformat(),
-                # FullCalendar memerlukan tarikh akhir eksklusif (tambah 1 hari untuk paparan tepat)
                 'end': (row['end_date'] + timedelta(days=1)).isoformat(),
                 'extendedProps': {
-                    'type': row['leave_type']
+                    'type': row['leave_name']
                 }
             })
 
     except Exception as e:
-        print(f"Error fetching calendar data: {e}")
+        print(f"Calendar Error: {e}")
         events = []
+
     finally:
         cur.close()
         conn.close()
 
     return render_template(
-        "team_calendar.html", 
-        events=events, 
+        "team_calendar.html",
+        events=events,
         active_page='team_calendar'
     )
 
+
 # =========================
-# TEAM HISTORY (FIXED SESSION & DB)
+# TEAM HISTORY
+# =========================
 @app.route("/team-history")
 def team_history():
-    # Kawalan Keselamatan: Hanya pengurusan & admin boleh lihat sejarah pasukan
+
     if 'emp_id' not in session or session.get('role') == 'Staff':
         flash("Anda tidak mempunyai kebenaran untuk akses halaman ini.", "danger")
         return redirect(url_for("dashboard"))
@@ -607,12 +661,10 @@ def team_history():
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     try:
-        # Query untuk mendapatkan sejarah cuti penuh beserta nama jabatan
-        # Pastikan nama kolum (mc_path/attachment_path) sepadan dengan DB anda
         cur.execute("""
-            SELECT 
+            SELECT
                 lr.request_id,
-                lr.leave_type,
+                lt.leave_name,
                 lr.start_date,
                 lr.end_date,
                 lr.duration,
@@ -621,30 +673,37 @@ def team_history():
                 e.full_name,
                 d.dept_name
             FROM leave_requests lr
-            JOIN employees e ON lr.emp_id = e.emp_id
-            LEFT JOIN departments d ON e.dept_id = d.dept_id
+            JOIN employees e
+                ON lr.emp_id = e.emp_id
+            JOIN leave_types lt
+                ON lr.leave_type_id = lt.type_id
+            LEFT JOIN departments d
+                ON e.dept_id = d.dept_id
             ORDER BY lr.created_at DESC
         """)
+
         history_data = cur.fetchall()
 
     except Exception as e:
         print(f"Database Error: {e}")
         history_data = []
+
     finally:
         cur.close()
         conn.close()
 
     return render_template(
-        "team_history.html", 
-        history=history_data, 
+        "team_history.html",
+        history=history_data,
         active_page='team_history'
     )
 
 # =========================
-# REPORTS & ANALYTICS (FIXED SESSION & DB)
+# REPORTS
+# =========================
 @app.route("/reports")
 def reports():
-    # Kawalan Keselamatan: Hanya pengurusan & admin boleh melihat analitik
+
     if 'emp_id' not in session or session.get('role') == 'Staff':
         flash("Anda tidak mempunyai kebenaran untuk akses halaman ini.", "danger")
         return redirect(url_for("dashboard"))
@@ -653,65 +712,86 @@ def reports():
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     try:
-        # 1. Kira statistik untuk kad (Total Approved, Pending, dan Top Type)
+
         cur.execute("""
-            SELECT 
-                COUNT(*) FILTER (WHERE status = 'Approved') as total_approved,
-                COUNT(*) FILTER (WHERE status = 'Pending') as total_pending,
-                mode() WITHIN GROUP (ORDER BY leave_type) as top_type
-            FROM leave_requests
-            WHERE EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM CURRENT_DATE)
+            SELECT
+                COUNT(*) FILTER (WHERE lr.status='Approved') AS total_approved,
+                COUNT(*) FILTER (WHERE lr.status='Pending') AS total_pending,
+                mode() WITHIN GROUP (ORDER BY lt.leave_name) AS top_type
+            FROM leave_requests lr
+            JOIN leave_types lt
+                ON lr.leave_type_id = lt.type_id
+            WHERE EXTRACT(YEAR FROM lr.created_at)
+                = EXTRACT(YEAR FROM CURRENT_DATE)
         """)
+
         stats = cur.fetchone()
 
-        # 2. Data untuk Carta Pai (Leave Distribution)
-        # Kami mengambil kira 4 kategori utama seperti dalam HTML: Annual, Medical, Emergency, Other
         cur.execute("""
-            SELECT leave_type, COUNT(*) as count 
-            FROM leave_requests 
-            WHERE status = 'Approved'
-            GROUP BY leave_type
+            SELECT
+                lt.leave_name,
+                COUNT(*) AS count
+            FROM leave_requests lr
+            JOIN leave_types lt
+                ON lr.leave_type_id = lt.type_id
+            WHERE lr.status='Approved'
+            GROUP BY lt.leave_name
         """)
+
         distribution_rows = cur.fetchall()
-        
-        # Susun data mengikut urutan labels di HTML: ['Annual', 'Medical', 'Emergency', 'Other']
-        dist_map = {r['leave_type']: r['count'] for r in distribution_rows}
+
+        dist_map = {
+            r['leave_name']: r['count']
+            for r in distribution_rows
+        }
+
         chart_data = [
-            dist_map.get('Annual Leave', 0),
-            dist_map.get('Medical Leave', 0),
-            dist_map.get('Emergency Leave', 0),
-            dist_map.get('Other', 0)
+            dist_map.get('Annual', 0),
+            dist_map.get('Medical', 0),
+            dist_map.get('Emergency', 0),
+            dist_map.get('Unpaid', 0)
         ]
 
-        # 3. Data untuk Carta Aliran Bulanan (Monthly Trend)
         cur.execute("""
-            SELECT EXTRACT(MONTH FROM start_date) as month, COUNT(*) as count
+            SELECT
+                EXTRACT(MONTH FROM start_date) AS month,
+                COUNT(*) AS count
             FROM leave_requests
-            WHERE status = 'Approved' 
-              AND EXTRACT(YEAR FROM start_date) = EXTRACT(YEAR FROM CURRENT_DATE)
+            WHERE status='Approved'
+            AND EXTRACT(YEAR FROM start_date)
+                = EXTRACT(YEAR FROM CURRENT_DATE)
             GROUP BY month
             ORDER BY month
         """)
+
         trend_rows = cur.fetchall()
-        
-        # Inisialisasi 6 bulan pertama (Jan-Jun) seperti dalam HTML
-        monthly_trend = [0] * 6 
+
+        monthly_trend = [0] * 12
+
         for r in trend_rows:
             month_idx = int(r['month']) - 1
-            if month_idx < 6: # Hanya ambil Jan hingga Jun buat masa ini
+
+            if 0 <= month_idx < 12:
                 monthly_trend[month_idx] = r['count']
 
     except Exception as e:
-        print(f"Error generating reports: {e}")
-        stats = {'total_approved': 0, 'total_pending': 0, 'top_type': 'N/A'}
+        print(f"Reports Error: {e}")
+
+        stats = {
+            'total_approved': 0,
+            'total_pending': 0,
+            'top_type': 'N/A'
+        }
+
         chart_data = [0, 0, 0, 0]
-        monthly_trend = [0, 0, 0, 0, 0, 0]
+        monthly_trend = [0] * 12
+
     finally:
         cur.close()
         conn.close()
 
     return render_template(
-        "reports.html", 
+        "reports.html",
         stats=stats,
         chart_data=chart_data,
         monthly_trend=monthly_trend,
@@ -838,15 +918,15 @@ def delete_user(id):
 
     return redirect(url_for('manage_users'))
 
+
 # =========================
-# SYSTEM LOGS (FIXED SESSION & DB)
+# SYSTEM LOGS
+# =========================
 @app.route('/system_logs')
 def system_logs():
-    # 1. Logik pengambilan data menggunakan SQL
-    # Kita menggunakan LEFT JOIN untuk memastikan aktiviti sistem (tiada emp_id) 
-    # tetap dipaparkan sebagai 'System Core'
+
     query = """
-        SELECT 
+        SELECT
             sl.log_id,
             sl.action,
             sl.details,
@@ -854,40 +934,57 @@ def system_logs():
             sl.created_at,
             e.full_name
         FROM system_logs sl
-        LEFT JOIN employees e ON sl.emp_id = e.emp_id
+        LEFT JOIN employees e
+            ON sl.emp_id = e.emp_id
         ORDER BY sl.created_at DESC
         LIMIT 200
     """
-    
+
     try:
-        # Anda boleh menggunakan db.session (SQLAlchemy) atau cursor (psycopg2)
-        logs = db.session.execute(query).fetchall()
+        logs = db.session.execute(text(query)).fetchall()
+
     except Exception as e:
         print(f"Error fetching logs: {e}")
         logs = []
-        flash("Unable to retrieve system logs at this time.", "danger")
 
-    # 2. Hantar data ke template system_logs.html
-    return render_template('system_logs.html', logs=logs, active_page='system_logs')
+    return render_template(
+        'system_logs.html',
+        logs=logs,
+        active_page='system_logs'
+    )
 
-# --- FUNGSI TAMBAHAN (Helper Function) ---
-# Anda boleh panggil fungsi ini di mana-mana route lain (Contoh: semasa Add User)
-# untuk merekodkan aktiviti secara automatik.
 
+# =========================
+# HELPER: REKOD AKTIVITI KE SYSTEM LOGS
 def record_activity(action, details, emp_id=None):
-    ip_addr = request.remote_addr # Mengambil IP penyerah (user)
-    
+
+    ip_addr = request.remote_addr
+
     insert_query = """
-        INSERT INTO system_logs (emp_id, action, details, ip_address, created_at)
-        VALUES (:emp_id, :action, :details, :ip, :timestamp)
+        INSERT INTO system_logs (
+            emp_id,
+            action,
+            details,
+            ip_address,
+            created_at
+        )
+        VALUES (
+            :emp_id,
+            :action,
+            :details,
+            :ip,
+            :timestamp
+        )
     """
-    db.session.execute(insert_query, {
+
+    db.session.execute(text(insert_query), {
         'emp_id': emp_id,
         'action': action,
         'details': details,
         'ip': ip_addr,
         'timestamp': datetime.now()
     })
+
     db.session.commit()
 
 # ==========================================
