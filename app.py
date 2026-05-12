@@ -261,11 +261,25 @@ def dashboard():
         stats = cur.fetchone()
 
         cur.execute("""
-            SELECT 
-                COALESCE(total_entitlement - used_days, 0) AS balance
-            FROM employee_balances
-            WHERE emp_id=%s AND leave_type_id=1
+            SELECT
+                (
+                    COALESCE(lt.default_entitlement, 14)
+                    -
+                    COALESCE(SUM(lr.duration), 0)
+                ) AS balance
+
+            FROM leave_types lt
+
+            LEFT JOIN leave_requests lr
+                ON lr.leave_type_id = lt.type_id
+                AND lr.emp_id = %s
+                AND lr.status = 'Approved'
+
+            WHERE lt.type_id = 1
+
+            GROUP BY lt.default_entitlement
         """, (emp_id,))
+
         annual_balance = cur.fetchone()
 
         cur.execute("""
@@ -371,32 +385,42 @@ def apply_leave():
     
     # Query ini menggunakan LEFT JOIN biasa, tidak perlu fungsi di PostgreSQL
     cur.execute("""
-                    SELECT 
-                        e.*,
-                        m.full_name AS manager_name,
+        SELECT
+            e.*,
 
-                        (
-                            COALESCE(lt.default_entitlement, 14)
-                            -
-                            COALESCE((
-                                SELECT SUM(lr.duration)
-                                FROM leave_requests lr
-                                WHERE lr.emp_id = e.emp_id
-                                AND lr.leave_type_id = 1
-                                AND lr.status = 'Approved'
-                            ), 0)
-                        ) AS remaining_leave
+            COALESCE(
+                direct_manager.full_name,
+                dept_manager.full_name
+            ) AS manager_name,
 
-                    FROM employees e
+            (
+                COALESCE(lt.default_entitlement, 14)
+                -
+                COALESCE((
+                    SELECT SUM(lr.duration)
+                    FROM leave_requests lr
+                    WHERE lr.emp_id = e.emp_id
+                    AND lr.leave_type_id = 1
+                    AND lr.status = 'Approved'
+                ), 0)
+            ) AS remaining_leave
 
-                    LEFT JOIN employees m
-                        ON e.manager_id = m.emp_id
+        FROM employees e
 
-                    LEFT JOIN leave_types lt
-                        ON lt.type_id = 1
+        LEFT JOIN employees direct_manager
+            ON e.manager_id = direct_manager.emp_id
 
-                    WHERE e.emp_id = %s
-                """, (session['emp_id'],))
+        LEFT JOIN departments d
+            ON e.dept_id = d.dept_id
+
+        LEFT JOIN employees dept_manager
+            ON d.manager_id = dept_manager.emp_id
+
+        LEFT JOIN leave_types lt
+            ON lt.type_id = 1
+
+        WHERE e.emp_id = %s
+    """, (session['emp_id'],))
     
     user_data = cur.fetchone()
     cur.close()
@@ -443,26 +467,71 @@ def records():
 # =========================
 @app.route('/profile')
 def profile():
-    # Semak sesi pengguna menggunakan emp_id yang konsisten
-    if 'emp_id' not in session:
+
+    # Consistent session check
+    if 'user_id' not in session:
+        flash("Please login first.", "warning")
         return redirect(url_for('login'))
-    
-    emp_id = session.get('emp_id')
+
+    emp_id = session['user_id']
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
-    # Ambil data lengkap pekerja
-    cur.execute("SELECT * FROM employees WHERE emp_id = %s", (emp_id,))
-    user_info = cur.fetchone()
-    
-    cur.close()
-    conn.close()
 
-    # Pastikan active_page diletakkan supaya 'indicator' di nav berfungsi
-    return render_template('profile.html', 
-                           user=user_info, 
-                           active_page='profile')
+    try:
+
+        # Ambil full profile + department + approver
+        cur.execute("""
+            SELECT 
+                e.emp_id,
+                e.full_name,
+                e.email,
+                e.role,
+                e.profile_pic,
+                e.joined_date,
+                e.emergency_name,
+                e.emergency_relation,
+                e.emergency_phone,
+                e.is_active,
+
+                d.dept_name,
+                d.dept_code,
+
+                m.full_name AS manager_name,
+                m.role AS manager_role
+
+            FROM employees e
+
+            LEFT JOIN departments d
+                ON e.dept_id = d.dept_id
+
+            LEFT JOIN employees m
+                ON e.manager_id = m.emp_id
+
+            WHERE e.emp_id = %s
+
+        """, (emp_id,))
+
+        user_info = cur.fetchone()
+
+    except Exception as e:
+
+        print(f"Profile Error: {e}")
+
+        flash("Unable to load profile data.", "danger")
+
+        user_info = None
+
+    finally:
+
+        cur.close()
+        conn.close()
+
+    return render_template(
+        'profile.html',
+        user=user_info,
+        active_page='profile'
+    )
 
 # =========================
 # APPROVAL (DYNAMIC - NO DEDUCTION NEEDED)
@@ -514,46 +583,106 @@ def reject(id):
     return redirect(url_for("dashboard"))
 
 # =========================
-# APPROVE/REJECT WITH REMARKS (DYNAMIC - NO DEDUCTION NEEDED)
+# APPROVE/REJECT WITH REMARKS
+# =========================
 @app.route("/approve_reject_leave/<int:request_id>", methods=["POST"])
 def approve_reject_leave(request_id):
+
+    # =========================
+    # SECURITY CHECK
+    # =========================
     if 'emp_id' not in session or session.get('role') == 'Staff':
         return jsonify({"error": "Unauthorized"}), 403
 
-    action = request.form.get("action") # 'approve' atau 'reject'
-    admin_remark = request.form.get("admin_remark", "")
+    action = request.form.get("action")
+    supervisor_remark = request.form.get("admin_remark", "").strip()
+
     approver_id = session['emp_id']
 
     conn = get_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
+
+        # =========================
+        # VALIDATE ACTION
+        # =========================
         if action == "approve":
             status = "Approved"
             flash_msg = "Permohonan cuti telah diluluskan."
-        else:
+
+        elif action == "reject":
             status = "Rejected"
             flash_msg = "Permohonan cuti telah ditolak."
 
-        # Update status permohonan
-        cur.execute("""
-            UPDATE leave_requests 
-            SET status = %s, 
-                admin_remark = %s, 
-                approved_by = %s, 
-                updated_at = CURRENT_TIMESTAMP
-            WHERE request_id = %s
-        """, (status, admin_remark, approver_id, request_id))
+        else:
+            flash("Tindakan tidak sah.", "danger")
+            return redirect(url_for("pending_approvals"))
 
-        # Log tindakan ke dalam system logs
-        log_action(approver_id, 'LEAVE_DECISION', f'{status} request ID: {request_id}')
+        # =========================
+        # CHECK REQUEST EXIST
+        # =========================
+        cur.execute("""
+            SELECT request_id, status
+            FROM leave_requests
+            WHERE request_id = %s
+        """, (request_id,))
+
+        leave_request = cur.fetchone()
+
+        if not leave_request:
+            flash("Permohonan cuti tidak dijumpai.", "danger")
+            return redirect(url_for("pending_approvals"))
+
+        # =========================
+        # PREVENT DOUBLE APPROVAL
+        # =========================
+        if leave_request['status'] != 'Pending':
+            flash("Permohonan ini telah diproses sebelum ini.", "warning")
+            return redirect(url_for("pending_approvals"))
+
+        # =========================
+        # UPDATE LEAVE REQUEST
+        # =========================
+        cur.execute("""
+            UPDATE leave_requests
+            SET
+                status = %s,
+                supervisor_remarks = %s,
+                approver_id = %s,
+                approved_at = CURRENT_TIMESTAMP
+            WHERE request_id = %s
+        """, (
+            status,
+            supervisor_remark,
+            approver_id,
+            request_id
+        ))
+
+        # =========================
+        # SYSTEM LOG
+        # =========================
+        log_action(
+            approver_id,
+            'LEAVE_DECISION',
+            f'{status} leave request ID: {request_id}'
+        )
 
         conn.commit()
+
         flash(flash_msg, "success")
 
     except Exception as e:
+
         conn.rollback()
-        flash(f"Ralat berlaku: {str(e)}", "danger")
+
+        print(f"Approve/Reject Error: {e}")
+
+        flash(
+            f"Ralat berlaku semasa memproses permohonan: {str(e)}",
+            "danger"
+        )
+
     finally:
         cur.close()
         conn.close()
