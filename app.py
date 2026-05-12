@@ -17,7 +17,7 @@ app.secret_key = "tck_esolutions_secret"
 
 # --- KONFIGURASI DATABASE ---
 # Format: postgresql://username:password@localhost:port/nama_db
-app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:12345@localhost:5432/TCK_Leave_System' && 'postgresql://postgres:00000@localhost:5432/TCK_Leave_System'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:12345@localhost:5432/TCK_Leave_System'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Inisialisasi objek 'db'
@@ -78,7 +78,7 @@ def get_db_connection():
         host="localhost",
         database="TCK_Leave_System",
         user="postgres",
-        password="12345" && "00000",
+        password="12345",
         cursor_factory=RealDictCursor
     )
 
