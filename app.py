@@ -465,65 +465,76 @@ def records():
 # =========================
 # USER PROFILE
 # =========================
-@app.route('/profile')
+@app.route('/profile', methods=['GET', 'POST'])
 def profile():
-
-    # Consistent session check
-    if 'user_id' not in session:
-        flash("Please login first.", "warning")
+    # Pastikan guna 'emp_id' supaya sync dengan Login
+    if 'emp_id' not in session:
+        flash("Sila login terlebih dahulu.", "warning")
         return redirect(url_for('login'))
 
-    emp_id = session['user_id']
-
+    emp_id = session['emp_id']
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
+        # =========================
+        # PROSES UPDATE (POST)
+        # =========================
+        if request.method == 'POST':
+            action = request.form.get('action')
+            if action == 'update_info':
+                cur.execute("""
+                    UPDATE employees SET 
+                    emergency_name = %s, emergency_relation = %s, emergency_phone = %s
+                    WHERE emp_id = %s
+                """, (request.form.get('emergency_name'), request.form.get('emergency_relation'), 
+                      request.form.get('emergency_phone'), emp_id))
+                conn.commit()
+                flash("Maklumat kecemasan berjaya dikemaskini.", "success")
 
-        # Ambil full profile + department + approver
+        # =========================
+        # AMBIL DATA PROFIL (GET)
+        # =========================
+        # Saya sesuaikan query ini dengan struktur DB anda yang sebenar
         cur.execute("""
             SELECT 
-                e.emp_id,
-                e.full_name,
-                e.email,
-                e.role,
-                e.profile_pic,
-                e.joined_date,
-                e.emergency_name,
-                e.emergency_relation,
-                e.emergency_phone,
-                e.is_active,
-
-                d.dept_name,
-                d.dept_code,
-
+                e.*, 
+                d.dept_name, 
+                d.dept_code, 
                 m.full_name AS manager_name,
-                m.role AS manager_role
-
+                -- Ambil baki cuti tahunan (Annual Leave - ID 1) dari leave_types
+                COALESCE(lt.default_entitlement, 14) AS total_leave,
+                -- Kira jumlah cuti yang telah lulus (Approved)
+                COALESCE((
+                    SELECT SUM(duration) FROM leave_requests 
+                    WHERE emp_id = e.emp_id AND status = 'Approved' AND leave_type_id = 1
+                ), 0) AS used_leave,
+                -- Status sama ada sedang cuti hari ini
+                EXISTS (
+                    SELECT 1 FROM leave_requests lr 
+                    WHERE lr.emp_id = e.emp_id AND lr.status = 'Approved' 
+                    AND CURRENT_DATE BETWEEN lr.start_date AND lr.end_date
+                ) AS on_leave
             FROM employees e
-
-            LEFT JOIN departments d
-                ON e.dept_id = d.dept_id
-
-            LEFT JOIN employees m
-                ON e.manager_id = m.emp_id
-
+            LEFT JOIN departments d ON e.dept_id = d.dept_id
+            LEFT JOIN employees m ON e.manager_id = m.emp_id
+            LEFT JOIN leave_types lt ON lt.type_id = 1 -- Merujuk kepada Annual Leave
             WHERE e.emp_id = %s
-
         """, (emp_id,))
-
+        
         user_info = cur.fetchone()
 
+        # JIKA DATA MASIH TIADA (Safety Check)
+        if not user_info:
+            flash("Data profil tidak dijumpai.", "danger")
+            return redirect(url_for('dashboard'))
+
     except Exception as e:
-
+        if conn: conn.rollback()
         print(f"Profile Error: {e}")
-
-        flash("Unable to load profile data.", "danger")
-
+        flash("Gagal memuatkan profil.", "danger")
         user_info = None
-
     finally:
-
         cur.close()
         conn.close()
 
