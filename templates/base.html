@@ -93,11 +93,12 @@
                             {% if active_page == 'records' %} bg-blue-600 text-white {% else %} text-slate-700 hover:bg-blue-50 {% endif %}">
                             My Leave History
                         </a>
+                        
                     </div>
                 </div>
 
                 <!-- Peranan Manager/Executive/CTO/COO -->
-                {% if session.get('role') in ['Manager', 'SV', 'CTO', 'COO', 'Supervisor', 'Executive', 'Admin'] %}
+                {% if session.get('role') in ['CTO', 'COO', 'Finance Director'] %}
                 <div class="relative dropdown">
                     <button class="px-5 py-1.5 rounded-xl text-sm font-semibold flex items-center space-x-1 transition-all
                         {% if active_page in ['pending_approvals', 'team_history', 'team_calendar', 'reports'] %} text-blue-600 bg-white shadow-sm {% else %} text-slate-600 hover:text-slate-900 {% endif %}">
@@ -130,7 +131,7 @@
                 {% endif %}
 
                 <!-- Peranan Admin Sahaja -->
-                {% if session.get('role') in ['admin', 'Admin'] %}
+                {% if session.get('role') in ['Admin'] %}
                 <div class="relative dropdown">
                     <button class="px-5 py-1.5 rounded-xl text-sm font-semibold flex items-center space-x-1 transition-all
                         {% if active_page in ['manage_users', 'manage_departments', 'system_logs'] %} text-blue-600 bg-white shadow-sm {% else %} text-slate-600 hover:text-slate-900 {% endif %}">
@@ -161,7 +162,7 @@
                     <button class="flex items-center space-x-3 focus:outline-none group">
                         <div class="text-right hidden sm:block">
                             <p class="text-xs font-bold text-slate-900 leading-none">
-                                {{ session.get('name', 'User') }}
+                                {{ session.get('full_name', 'User') }}
                             </p>
                             <p class="text-[10px] text-slate-400 font-medium uppercase mt-1 tracking-tighter">
                                 {{ session.get('role', 'Staff') }}

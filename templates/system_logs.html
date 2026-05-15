@@ -1,28 +1,20 @@
 {% extends "base.html" %}
-
 {% block title %}System Audit Logs | TCK Leave{% endblock %}
-
 {% block content %}
 <div class="max-w-7xl mx-auto px-6 pb-16 animate-fadeIn">
-    
     <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
         <div>
             <span class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-2 block">Security & Audit</span>
             <h1 class="text-5xl font-extrabold text-slate-900 tracking-tight">System Logs</h1>
             <p class="text-slate-500 font-medium mt-2 text-lg">Audit trail of all administrative and system activities.</p>
         </div>
-
         <div class="hidden md:flex">
             <div class="bg-white/70 backdrop-blur-md border border-white px-6 py-4 rounded-[1.5rem] shadow-xl shadow-slate-100/50 flex flex-col items-end">
                 <span class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Log Status</span>
-                <span class="text-sm font-bold text-emerald-600 flex items-center">
-                    <span class="h-2 w-2 rounded-full bg-emerald-500 inline-block mr-2 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                    Recording Active
-                </span>
+                <span class="text-sm font-bold text-emerald-600 flex items-center"> <span class="h-2 w-2 rounded-full bg-emerald-500 inline-block mr-2 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span> Recording Active </span>
             </div>
         </div>
     </div>
-
     <div class="bg-white/70 backdrop-blur-2xl p-4 rounded-[2rem] border border-white mb-10 shadow-xl shadow-slate-100/50 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div class="relative flex-1 w-full max-w-md">
             <div class="absolute inset-y-0 left-5 flex items-center pointer-events-none">
@@ -32,14 +24,10 @@
                 class="w-full bg-slate-100/50 border-none focus:ring-2 focus:ring-blue-500/20 rounded-2xl py-4 pl-14 pr-6 text-sm font-bold text-slate-700 placeholder-slate-400 transition-all" 
                 placeholder="Search actions or users...">
         </div>
-        
         <div class="px-6">
-            <span class="bg-slate-900 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200">
-                {{ logs|length }} Total Events
-            </span>
+            <span class="bg-slate-900 text-white px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-slate-200"> {{ logs|length }} Total Events </span>
         </div>
     </div>
-
     <div class="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/60 border border-slate-50 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left border-collapse" id="logTable">
@@ -55,91 +43,47 @@
                 <tbody class="divide-y divide-slate-50">
                     {% for log in logs %}
                     <tr class="hover:bg-blue-50/30 transition-colors group">
-                        <td class="px-8 py-6">
-                            <div class="flex flex-col">
-                                <span class="text-sm font-bold text-slate-900">
-                                    {{ log.created_at.strftime('%d %b %Y') }}
-                                </span>
-                                <span class="text-[10px] font-black text-blue-500 uppercase tracking-tighter">
-                                    {{ log.created_at.strftime('%I:%M %p') }}
-                                </span>
-                            </div>
-                        </td>
-                        <td class="px-8 py-6">
-                            <div class="flex items-center gap-4">
-                                <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500 font-bold group-hover:from-slate-900 group-hover:to-slate-800 group-hover:text-white transition-all shadow-sm">
-                                    {{ (log.full_name[0] if log.full_name else 'S')|upper }}
-                                </div>
-                                <span class="text-sm font-bold text-slate-700">
-                                    {{ log.full_name if log.full_name else 'System Core' }}
-                                </span>
-                            </div>
-                        </td>
-                        <td class="px-8 py-6">
-                            {% set action_color = 'bg-slate-100 text-slate-600 border-slate-200' %}
-                            {% if 'DELETE' in log.action or 'REJECT' in log.action %}
-                                {% set action_color = 'bg-rose-50 text-rose-600 border-rose-100' %}
-                            {% elif 'ADD' in log.action or 'CREATE' in log.action or 'APPROVE' in log.action or 'LOGIN' in log.action %}
-                                {% set action_color = 'bg-emerald-50 text-emerald-600 border-emerald-100' %}
-                            {% elif 'UPDATE' in log.action or 'EDIT' in log.action %}
-                                {% set action_color = 'bg-amber-50 text-amber-600 border-amber-100' %}
-                            {% endif %}
-                            
-                            <span class="inline-flex items-center px-4 py-1.5 {{ action_color }} border rounded-full text-[9px] font-black uppercase tracking-[0.1em]">
-                                {{ log.action }}
-                            </span>
-                        </td>
-                        <td class="px-8 py-6">
-                            <p class="text-sm text-slate-500 font-medium max-w-xs group-hover:text-slate-900 transition-colors">
-                                {{ log.details }}
-                            </p>
-                        </td>
-                        <td class="px-8 py-6 text-right">
-                            <span class="text-[10px] font-mono font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 group-hover:bg-white transition-colors">
-                                {{ log.ip_address }}
-                            </span>
-                        </td>
+                        <td class="px-8 py-6"> <div class="flex flex-col"> <span class="text-sm font-bold text-slate-900"> {{ log.created_at.strftime('%d %b %Y') }} </span> <span class="text-[10px] font-black text-blue-500 uppercase tracking-tighter"> {{ log.created_at.strftime('%I:%M %p') }} </span> </div> </td>
+                        <td class="px-8 py-6"> <div class="flex items-center gap-4"> <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-500 font-bold group-hover:from-slate-900 group-hover:to-slate-800 group-hover:text-white transition-all shadow-sm"> {{ (log.full_name[0] if log.full_name else 'S')|upper }} </div> <span class="text-sm font-bold text-slate-700"> {{ log.full_name if log.full_name else 'System Core' }} </span> </div> </td>
+                        <td class="px-8 py-6"> {% set action_color = 'bg-slate-100 text-slate-600 border-slate-200' %} {% if 'DELETE' in log.action or 'REJECT' in log.action %} {% set action_color = 'bg-rose-50 text-rose-600 border-rose-100' %} {% elif 'ADD' in log.action or 'CREATE' in log.action or 'APPROVE' in log.action or 'LOGIN' in log.action %} {% set action_color = 'bg-emerald-50 text-emerald-600 border-emerald-100' %} {% elif 'UPDATE' in log.action or 'EDIT' in log.action %} {% set action_color = 'bg-amber-50 text-amber-600 border-amber-100' %} {% endif %} <span class="inline-flex items-center px-4 py-1.5 {{ action_color }} border rounded-full text-[9px] font-black uppercase tracking-[0.1em]"> {{ log.action }} </span> </td>
+                        <td class="px-8 py-6"> <p class="text-sm text-slate-500 font-medium max-w-xs group-hover:text-slate-900 transition-colors"> {{ log.details }} </p> </td>
+                        <td class="px-8 py-6 text-right"> <span class="text-[10px] font-mono font-black text-slate-400 bg-slate-50 px-3 py-1.5 rounded-lg border border-slate-100 group-hover:bg-white transition-colors"> {{ log.ip_address }} </span> </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-
         {% if not logs %}
         <div class="p-32 text-center">
-            <div class="text-6xl mb-6 grayscale opacity-30">📜</div>
+            <div class="text-6xl mb-6 grayscale opacity-30">
+                📜
+            </div>
             <p class="text-slate-900 font-black text-2xl tracking-tight">Logs are Empty</p>
             <p class="text-slate-400 font-medium mt-2">No system activity has been recorded yet.</p>
         </div>
         {% endif %}
     </div>
 </div>
-
 <style>
     .animate-fadeIn { animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     @keyframes fadeIn { 
         from { opacity: 0; transform: translateY(30px); filter: blur(10px); } 
         to { opacity: 1; transform: translateY(0); filter: blur(0); } 
     }
-    
-    /* Smooth transition for table rows */
     #logTable tbody tr {
         transition: all 0.3s ease;
     }
 </style>
-
 <script>
     function filterLogs() {
         const input = document.getElementById('logSearch');
         const filter = input.value.toUpperCase();
         const table = document.getElementById('logTable');
         const tr = table.getElementsByTagName('tr');
-
-        for (let i = 1; i < tr.length; i++) {
+        for (let i = 1; i  tr.length; i++) {
             const tdActor = tr[i].getElementsByTagName('td')[1];
             const tdAction = tr[i].getElementsByTagName('td')[2];
             const tdDetails = tr[i].getElementsByTagName('td')[3];
-            
             if (tdActor || tdAction || tdDetails) {
                 const textValue = (tdActor.textContent + tdAction.textContent + tdDetails.textContent).toUpperCase();
                 if (textValue.indexOf(filter) > -1) {

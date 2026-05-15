@@ -22,7 +22,7 @@
     </header>
 
     <!-- WIDGET 1: Leave Entitlement (For Staff/Manager) -->
-    {% if session["role"] != 'Admin' %}
+    {% if session["role"] != 'Staff' %}
     <section class="mb-12">
         <div class="flex items-center gap-3 mb-6">
             <h2 class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">01. Your Leave Balance</h2>
@@ -47,8 +47,8 @@
     </section>
     {% endif %}
 
-    <!-- WIDGET 2: Management Tasks (Supervisor/Manager) -->
-    {% if session["role"] in ['Supervisor', 'Manager', 'Executive'] %}
+    <!-- WIDGET 2: Management Tasks (Manager) -->
+    {% if session["role"] in [ 'CTO' , 'COO' , 'FD' ] %}
     <section class="mb-12">
         <div class="bg-slate-900 rounded-[2.5rem] p-10 flex flex-col md:flex-row items-center justify-between shadow-2xl shadow-slate-900/20 relative overflow-hidden">
             <!-- Decorative Pattern -->

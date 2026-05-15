@@ -1,24 +1,12 @@
 {% extends "base.html" %}
-
-{% block title %}Apply Leave | SmartLeave{% endblock %}
-
-{% block content %}
+{% block title %}Apply Leave | SmartLeave{% endblock %} {% block content %}
 <div class="max-w-7xl mx-auto px-6 pb-16 animate-fadeIn">
-    
-    <!-- Header Section: Apple-Style Hierarchy -->
     <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
         <div>
             <span class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-2 block">New Request</span>
             <h1 class="text-5xl font-extrabold text-slate-900 tracking-tight">Apply Leave</h1>
-            <p class="text-slate-500 font-medium mt-2 text-lg">
-                Approver: 
-                <span class="text-slate-900 font-bold bg-slate-100 px-3 py-1 rounded-lg ml-1">
-                    {% if user.manager_name %}{{ user.manager_name }}{% else %}Management (HQ){% endif %}
-                </span>
-            </p>
+            <p class="text-slate-500 font-medium mt-2 text-lg"> Approver: <span class="text-slate-900 font-bold bg-slate-100 px-3 py-1 rounded-lg ml-1"> {% if user.manager_name %}{{ user.manager_name }}{% else %}Management (HQ){% endif %} </span> </p>
         </div>
-
-        <!-- Balance Display: iOS Pill Design -->
         <div class="flex bg-white/70 backdrop-blur-xl p-2 rounded-[2rem] shadow-xl shadow-slate-200/50 border border-white">
             <div class="px-8 py-3 bg-slate-900 rounded-[1.5rem] shadow-lg shadow-slate-300">
                 <p class="text-[9px] font-black uppercase tracking-widest text-slate-400">Annual</p>
@@ -30,83 +18,54 @@
             </div>
         </div>
     </div>
-
     <form action="{{ url_for('apply_leave') }}" method="POST" enctype="multipart/form-data" novalidate class="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        
-        <!-- Main Form Column: Glassmorphism Card -->
         <div class="lg:col-span-2 space-y-8">
             <div class="bg-white/80 backdrop-blur-2xl rounded-[3rem] border border-white p-10 shadow-2xl shadow-slate-200/60 space-y-12">
-                
-                <!-- Leave Type Selection: Grid Icons -->
                 <div class="space-y-6">
                     <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Leave Category</label>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-5">
                         {% for type, icon in [('Annual', '📅'), ('Medical', '🏥'), ('Emergency', '🚨'), ('Unpaid', '💸')] %}
-                        <label class="group cursor-pointer">
-                            <input type="radio" name="leave_type" value="{{ type }}" class="peer sr-only" {% if loop.first %}checked{% endif %} onchange="toggleMCUpload(this.value)">
-                            <div class="py-8 px-4 text-center bg-slate-50/50 border-2 border-transparent rounded-[2rem] transition-all duration-300 peer-checked:border-blue-500 peer-checked:bg-white peer-checked:shadow-2xl peer-checked:scale-105 group-hover:bg-slate-100">
-                                <span class="block text-4xl mb-3 transform group-hover:scale-110 transition-transform">{{ icon }}</span>
-                                <span class="text-[11px] font-black uppercase tracking-widest text-slate-900">{{ type }}</span>
-                            </div>
-                        </label>
+                        <label class="group cursor-pointer"> <input type="radio" name="leave_type" value="{{ type }}" class="peer sr-only" {% if loop.first %}checked{% endif %} onchange="toggleMCUpload(this.value)"> <div class="py-8 px-4 text-center bg-slate-50/50 border-2 border-transparent rounded-[2rem] transition-all duration-300 peer-checked:border-blue-500 peer-checked:bg-white peer-checked:shadow-2xl peer-checked:scale-105 group-hover:bg-slate-100"> <span class="block text-4xl mb-3 transform group-hover:scale-110 transition-transform">{{ icon }}</span> <span class="text-[11px] font-black uppercase tracking-widest text-slate-900">{{ type }}</span> </div> </label>
                         {% endfor %}
                     </div>
                 </div>
-
-                <!-- Date Selection: Clean Inputs -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div class="space-y-4">
                         <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Start Date</label>
-                        <input type="date" id="start_date" name="start_date" required onchange="calculateLogic()"
-                            class="w-full bg-slate-50/80 border-2 border-transparent p-6 rounded-[1.8rem] focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 outline-none text-slate-900 font-bold transition-all">
+                        <input type="date" id="start_date" name="start_date" required onchange="calculateLogic()" class="w-full bg-slate-50/80 border-2 border-transparent p-6 rounded-[1.8rem] focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 outline-none text-slate-900 font-bold transition-all">
                     </div>
                     <div class="space-y-4">
                         <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">End Date</label>
-                        <input type="date" id="end_date" name="end_date" required onchange="calculateLogic()"
-                            class="w-full bg-slate-50/80 border-2 border-transparent p-6 rounded-[1.8rem] focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 outline-none text-slate-900 font-bold transition-all">
+                        <input type="date" id="end_date" name="end_date" required onchange="calculateLogic()" class="w-full bg-slate-50/80 border-2 border-transparent p-6 rounded-[1.8rem] focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 outline-none text-slate-900 font-bold transition-all">
                     </div>
                 </div>
-
-                <!-- Toggle & Hidden Sections -->
                 <div class="space-y-5">
                     <div class="p-6 bg-slate-50/50 rounded-[2rem] flex items-center justify-between border border-slate-100">
                         <div class="flex items-center space-x-5">
-                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-2xl">🌓</div>
+                            <div class="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-sm text-2xl">
+                                🌓
+                            </div>
                             <div>
                                 <p class="text-base font-black text-slate-900 tracking-tight">Half Day Request</p>
                                 <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Single-day only</p>
                             </div>
                         </div>
-                        <label class="relative inline-flex items-center cursor-pointer scale-110">
-                            <input type="checkbox" id="half_day" name="half_day" class="sr-only peer" onchange="calculateLogic()">
-                            <div class="w-14 h-8 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all after:shadow-md"></div>
-                        </label>
+                        <label class="relative inline-flex items-center cursor-pointer scale-110"> <input type="checkbox" id="half_day" name="half_day" class="sr-only peer" onchange="calculateLogic()"> <div class="w-14 h-8 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-blue-600 after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:rounded-full after:h-6 after:w-6 after:transition-all after:shadow-md"></div> </label>
                     </div>
-
                     <div id="session_select" class="hidden animate-fadeIn p-2">
-                        <select name="session" class="w-full bg-white border-2 border-slate-100 px-8 py-5 rounded-[1.8rem] text-sm font-black outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/20 transition-all">
-                            <option value="AM">Morning Session (Starts 2:00 PM)</option>
-                            <option value="PM">Afternoon Session (Ends 1:00 PM)</option>
-                        </select>
+                        <select name="session" class="w-full bg-white border-2 border-slate-100 px-8 py-5 rounded-[1.8rem] text-sm font-black outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/20 transition-all"> <option value="AM">Morning Session (Ends 1:00 PM)</option> <option value="PM">Afternoon Session (Starts 2:00 PM)</option> </select>
                     </div>
-
-                    <!-- MC Upload: iOS File Picker Style -->
                     <div id="mc_upload_section" class="hidden space-y-6 animate-fadeIn">
-                        <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Medical Certificate <span class="text-rose-500">*</span></label>
+                        <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Medical Certificate <span class="text-rose-500">*</span> </label>
                         <div class="border-3 border-dashed border-slate-200 rounded-[2.5rem] p-12 text-center bg-slate-50/30 hover:bg-slate-50 hover:border-blue-300 transition-all relative group">
                             <input type="file" name="mc_file" id="mc_file" class="hidden" accept=".jpg,.jpeg,.png,.pdf" onchange="handleFileValidation(this)">
-                            <label id="upload_label" for="mc_file" class="cursor-pointer flex flex-col items-center">
-                                <div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-4 group-hover:scale-110 transition-transform">
-                                    <span class="text-3xl">📄</span>
-                                </div>
-                                <span class="text-xs font-black uppercase tracking-[0.2em] text-blue-600">Tap to Upload Document</span>
-                                <span class="text-[10px] text-slate-400 mt-2">JPG, PNG or PDF (Max 5MB)</span>
-                            </label>
-                            
+                            <label id="upload_label" for="mc_file" class="cursor-pointer flex flex-col items-center"> <div class="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-lg mb-4 group-hover:scale-110 transition-transform"> <span class="text-3xl">📄</span> </div> <span class="text-xs font-black uppercase tracking-[0.2em] text-blue-600">Tap to Upload Document</span> <span class="text-[10px] text-slate-400 mt-2">JPG, PNG or PDF (Max 5MB)</span> </label>
                             <div id="file_preview" class="hidden flex flex-col items-center animate-fadeIn">
                                 <div class="relative group/preview">
                                     <img id="preview_img" src="#" alt="MC Preview" class="hidden max-h-48 rounded-2xl shadow-2xl border-4 border-white mb-4">
-                                    <div id="pdf_icon" class="hidden text-6xl mb-4">📕</div>
+                                    <div id="pdf_icon" class="hidden text-6xl mb-4">
+                                        📕
+                                    </div>
                                     <button type="button" onclick="removeFile()" class="absolute -top-3 -right-3 bg-slate-900 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm shadow-2xl active:scale-90 transition-transform">✕</button>
                                 </div>
                                 <p id="file_name_display" class="text-xs font-black text-slate-900 truncate max-w-[250px] bg-white px-4 py-2 rounded-full shadow-sm"></p>
@@ -114,21 +73,15 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Reason Field -->
                 <div class="space-y-4">
                     <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-4">Reason / Justification</label>
-                    <textarea name="reason" rows="4" placeholder="Briefly describe the reason for your leave..." required
-                        class="w-full bg-slate-50/80 border-2 border-transparent p-8 rounded-[2rem] focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 outline-none text-slate-700 font-semibold transition-all resize-none"></textarea>
+                    <textarea name="reason" rows="4" placeholder="Briefly describe the reason for your leave..." required class="w-full bg-slate-50/80 border-2 border-transparent p-8 rounded-[2rem] focus:ring-4 focus:ring-blue-500/10 focus:bg-white focus:border-blue-500/20 outline-none text-slate-700 font-semibold transition-all resize-none"></textarea>
                 </div>
             </div>
         </div>
-
-        <!-- Sticky Summary: Dark Mode Sidebar -->
         <div class="lg:col-span-1">
             <div class="bg-slate-900 rounded-[3rem] p-10 text-white shadow-2xl sticky top-24 border border-white/5 shadow-slate-300">
                 <h2 class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 mb-10">Request Summary</h2>
-                
                 <div class="space-y-10 mb-12">
                     <div class="flex justify-between items-baseline border-b border-white/10 pb-8">
                         <span class="text-slate-500 text-[10px] font-black uppercase tracking-widest">Total Days</span>
@@ -142,7 +95,6 @@
                         <span id="display_return" class="text-xl font-black text-blue-400 tracking-tight">—</span>
                     </div>
                 </div>
-
                 <div id="smart_alert" class="hidden p-6 bg-blue-500/10 rounded-3xl border border-blue-500/20 text-xs leading-relaxed mb-10 animate-fadeIn">
                     <div class="flex items-center mb-2">
                         <span class="text-lg mr-2">💡</span>
@@ -150,150 +102,138 @@
                     </div>
                     <p class="text-slate-300 font-medium">Your request includes a weekend. This is a great way to maximize your rest time!</p>
                 </div>
-
                 <div class="space-y-4">
-                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-5 rounded-[1.8rem] transition-all shadow-xl shadow-blue-900/40 active:scale-95 text-sm uppercase tracking-widest">
-                        Submit Request
-                    </button>
-                    <a href="{{ url_for('dashboard') }}" class="block text-center text-slate-500 font-black text-[10px] uppercase tracking-[0.3em] hover:text-white transition-colors py-2">
-                        Discard Draft
-                    </a>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-black py-5 rounded-[1.8rem] transition-all shadow-xl shadow-blue-900/40 active:scale-95 text-sm uppercase tracking-widest"> Submit Request </button>
+                    <a href="{{ url_for('dashboard') }}" class="block text-center text-slate-500 font-black text-[10px] uppercase tracking-[0.3em] hover:text-white transition-colors py-2"> Discard Draft </a>
                 </div>
             </div>
         </div>
     </form>
 </div>
-
 <script>
-    // FUNGSI LOGIK DIKEKALKAN[cite: 5, 7]
-    function handleFileValidation(input) {
-        const file = input.files[0];
-        if (!file) return;
-        const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-        if (!allowedTypes.includes(file.type)) {
-            alert("Please upload JPG, PNG, or PDF files only.");
-            input.value = ""; return;
-        }
-        previewFile();
+  function handleFileValidation(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const allowedTypes = ['image/jpeg', 'image/png', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      alert("Please upload JPG, PNG, or PDF files only.");
+      input.value = "";
+      return;
     }
-
-    function toggleMCUpload(val) {
-        const section = document.getElementById('mc_upload_section');
-        const fileInput = document.getElementById('mc_file');
-        if (val === 'Medical') {
-            section.classList.remove('hidden');
-            fileInput.required = true;
+    previewFile();
+  }
+  function toggleMCUpload(val) {
+    const section = document.getElementById('mc_upload_section');
+    const fileInput = document.getElementById('mc_file');
+    if (val === 'Medical') {
+      section.classList.remove('hidden');
+      fileInput.required = true;
+    } else {
+      section.classList.add('hidden');
+      fileInput.required = false;
+      removeFile();
+    }
+  }
+  function previewFile() {
+    const fileInput = document.getElementById('mc_file');
+    const uploadLabel = document.getElementById('upload_label');
+    const filePreview = document.getElementById('file_preview');
+    const previewImg = document.getElementById('preview_img');
+    const pdfIcon = document.getElementById('pdf_icon');
+    const fileNameDisplay = document.getElementById('file_name_display');
+    const file = fileInput.files[0];
+    if (file) {
+      uploadLabel.classList.add('hidden');
+      filePreview.classList.remove('hidden');
+      fileNameDisplay.innerText = file.name;
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          previewImg.src = e.target.result;
+          previewImg.classList.remove('hidden');
+          pdfIcon.classList.add('hidden');
+        }
+        reader.readAsDataURL(file);
+      } else {
+        previewImg.classList.add('hidden');
+        pdfIcon.classList.remove('hidden');
+      }
+    }
+  }
+  function removeFile() {
+    document.getElementById('mc_file').value = "";
+    document.getElementById('upload_label').classList.remove('hidden');
+    document.getElementById('file_preview').classList.add('hidden');
+  }
+  function calculateLogic() {
+    const startInput = document.getElementById('start_date');
+    const endInput = document.getElementById('end_date');
+    const isHalfDay = document.getElementById('half_day');
+    const sessionBox = document.getElementById('session_select');
+    const displayDays = document.getElementById('display_days');
+    const displayReturn = document.getElementById('display_return');
+    const smartAlert = document.getElementById('smart_alert');
+    if (startInput.value) endInput.setAttribute('min', startInput.value);
+    if (startInput.value && endInput.value) {
+      const start = new Date(startInput.value);
+      const end = new Date(endInput.value);
+      if (end >= start) {
+        let diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        if (startInput.value === endInput.value) {
+          isHalfDay.disabled = false;
+          if (isHalfDay.checked) {
+            diffDays = 0.5;
+            sessionBox.classList.remove('hidden');
+          } else {
+            sessionBox.classList.add('hidden');
+          }
         } else {
-            section.classList.add('hidden');
-            fileInput.required = false;
-            removeFile();
+          isHalfDay.checked = false;
+          isHalfDay.disabled = true;
+          sessionBox.classList.add('hidden');
         }
+        displayDays.innerText = diffDays;
+        let returnDate = new Date(end);
+        returnDate.setDate(returnDate.getDate() + 1);
+        if (returnDate.getDay() === 6) returnDate.setDate(returnDate.getDate() + 2);
+        else if (returnDate.getDay() === 0) returnDate.setDate(returnDate.getDate() + 1);
+        displayReturn.innerText = returnDate.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+        if ((start.getDay() === 5 || end.getDay() === 1) && diffDays >= 1) smartAlert.classList.remove('hidden');
+        else smartAlert.classList.add('hidden');
+      }
     }
-
-    function previewFile() {
-        const fileInput = document.getElementById('mc_file');
-        const uploadLabel = document.getElementById('upload_label');
-        const filePreview = document.getElementById('file_preview');
-        const previewImg = document.getElementById('preview_img');
-        const pdfIcon = document.getElementById('pdf_icon');
-        const fileNameDisplay = document.getElementById('file_name_display');
-
-        const file = fileInput.files[0];
-        if (file) {
-            uploadLabel.classList.add('hidden');
-            filePreview.classList.remove('hidden');
-            fileNameDisplay.innerText = file.name;
-            if (file.type.startsWith('image/')) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    previewImg.src = e.target.result;
-                    previewImg.classList.remove('hidden');
-                    pdfIcon.classList.add('hidden');
-                }
-                reader.readAsDataURL(file);
-            } else {
-                previewImg.classList.add('hidden');
-                pdfIcon.classList.remove('hidden');
-            }
-        }
-    }
-
-    function removeFile() {
-        document.getElementById('mc_file').value = ""; 
-        document.getElementById('upload_label').classList.remove('hidden');
-        document.getElementById('file_preview').classList.add('hidden');
-    }
-
-    function calculateLogic() {
-        const startInput = document.getElementById('start_date');
-        const endInput = document.getElementById('end_date');
-        const isHalfDay = document.getElementById('half_day');
-        const sessionBox = document.getElementById('session_select');
-        const displayDays = document.getElementById('display_days');
-        const displayReturn = document.getElementById('display_return');
-        const smartAlert = document.getElementById('smart_alert');
-
-        if (startInput.value) endInput.setAttribute('min', startInput.value);
-
-        if (startInput.value && endInput.value) {
-            const start = new Date(startInput.value);
-            const end = new Date(endInput.value);
-
-            if (end >= start) {
-                let diffDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-
-                if (startInput.value === endInput.value) {
-                    isHalfDay.disabled = false;
-                    if (isHalfDay.checked) {
-                        diffDays = 0.5;
-                        sessionBox.classList.remove('hidden');
-                    } else {
-                        sessionBox.classList.add('hidden');
-                    }
-                } else {
-                    isHalfDay.checked = false;
-                    isHalfDay.disabled = true;
-                    sessionBox.classList.add('hidden');
-                }
-
-                displayDays.innerText = diffDays;
-
-                let returnDate = new Date(end);
-                returnDate.setDate(returnDate.getDate() + 1);
-                if (returnDate.getDay() === 6) returnDate.setDate(returnDate.getDate() + 2);
-                else if (returnDate.getDay() === 0) returnDate.setDate(returnDate.getDate() + 1);
-
-                displayReturn.innerText = returnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                
-                if ((start.getDay() === 5 || end.getDay() === 1) && diffDays >= 1) smartAlert.classList.remove('hidden');
-                else smartAlert.classList.add('hidden');
-            }
-        }
-    }
-
-    window.onload = () => {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('start_date').setAttribute('min', today);
-        document.getElementById('end_date').setAttribute('min', today);
-    };
+  }
+  window.onload = () => {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('start_date').setAttribute('min', today);
+    document.getElementById('end_date').setAttribute('min', today);
+  };
 </script>
-
 <style>
-    .animate-fadeIn { 
-        animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
+  .animate-fadeIn {
+    animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+      filter: blur(10px);
     }
-    
-    @keyframes fadeIn { 
-        from { opacity: 0; transform: translateY(30px); filter: blur(10px); } 
-        to { opacity: 1; transform: translateY(0); filter: blur(0); } 
+    to {
+      opacity: 1;
+      transform: translateY(0);
+      filter: blur(0);
     }
-
-    /* iOS Date Input Styling */
-    input[type="date"]::-webkit-calendar-picker-indicator {
-        opacity: 0.4;
-        cursor: pointer;
-        padding: 5px;
-        filter: invert(0.2);
-    }
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.4;
+    cursor: pointer;
+    padding: 5px;
+    filter: invert(0.2);
+  }
 </style>
 {% endblock %}

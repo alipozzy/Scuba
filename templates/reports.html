@@ -1,12 +1,8 @@
 {% extends "base.html" %}
-
 {% block title %}Analytics & Reports | TCK Leave{% endblock %}
-
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <div class="max-w-7xl mx-auto px-6 pb-16 animate-fadeIn">
-    
     <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
         <div>
             <span class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-2 block">Management Dashboard</span>
@@ -14,13 +10,9 @@
             <p class="text-slate-500 font-medium mt-2 text-lg">Data-driven insights for organization leave trends.</p>
         </div>
         <div class="flex">
-            <button onclick="window.print()" class="bg-slate-900 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-[1.5rem] transition-all shadow-xl shadow-slate-200 active:scale-95 text-sm flex items-center group">
-                <span class="mr-3 transition-transform group-hover:rotate-12">📄</span> 
-                Export Report
-            </button>
+            <button onclick="window.print()" class="bg-slate-900 hover:bg-blue-600 text-white font-bold py-4 px-8 rounded-[1.5rem] transition-all shadow-xl shadow-slate-200 active:scale-95 text-sm flex items-center group"> <span class="mr-3 transition-transform group-hover:rotate-12">📄</span> Export Report </button>
         </div>
     </div>
-
     <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
         <div class="bg-white/70 backdrop-blur-2xl p-8 rounded-[2.5rem] border border-white shadow-2xl shadow-slate-200/50 transition-transform hover:-translate-y-2">
             <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center mb-6 border border-blue-100">
@@ -30,7 +22,6 @@
             <h2 class="text-5xl font-black text-slate-900 tracking-tighter">{{ stats.total_approved if stats else 0 }}</h2>
             <p class="text-xs text-slate-400 mt-3 font-semibold">Accumulated this year</p>
         </div>
-        
         <div class="bg-white/70 backdrop-blur-2xl p-8 rounded-[2.5rem] border border-white shadow-2xl shadow-slate-200/50 transition-transform hover:-translate-y-2">
             <div class="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6 border border-emerald-100">
                 <span class="text-xl">🏆</span>
@@ -39,7 +30,6 @@
             <h2 class="text-3xl font-black text-slate-900 tracking-tight leading-tight">{{ stats.top_type if stats else 'N/A' }}</h2>
             <p class="text-xs text-slate-400 mt-3 font-semibold">Highest frequency</p>
         </div>
-
         <div class="bg-white/70 backdrop-blur-2xl p-8 rounded-[2.5rem] border border-white shadow-2xl shadow-slate-200/50 transition-transform hover:-translate-y-2">
             <div class="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center mb-6 border border-rose-100">
                 <span class="text-xl">⏳</span>
@@ -49,47 +39,37 @@
             <p class="text-xs text-slate-400 mt-3 font-semibold">Requiring review</p>
         </div>
     </div>
-
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
         <div class="bg-white rounded-[3.5rem] p-10 border border-slate-50 shadow-2xl shadow-slate-200/40 group">
             <div class="flex items-center justify-between mb-10">
-                <h3 class="text-xl font-black text-slate-900 tracking-tight flex items-center">
-                    <span class="w-2 h-8 bg-blue-600 rounded-full mr-4"></span>
-                    Leave Distribution
-                </h3>
+                <h3 class="text-xl font-black text-slate-900 tracking-tight flex items-center"> <span class="w-2 h-8 bg-blue-600 rounded-full mr-4"></span> Leave Distribution </h3>
             </div>
             <div class="h-[320px] flex justify-center items-center">
-                <canvas id="leaveTypeChart"></canvas>
+                <canvas id="leaveTypeChart">
+                </canvas>
             </div>
         </div>
-
         <div class="bg-white rounded-[3.5rem] p-10 border border-slate-50 shadow-2xl shadow-slate-200/40">
             <div class="flex items-center justify-between mb-10">
-                <h3 class="text-xl font-black text-slate-900 tracking-tight flex items-center">
-                    <span class="w-2 h-8 bg-slate-900 rounded-full mr-4"></span>
-                    Monthly Trend
-                </h3>
+                <h3 class="text-xl font-black text-slate-900 tracking-tight flex items-center"> <span class="w-2 h-8 bg-slate-900 rounded-full mr-4"></span> Monthly Trend </h3>
             </div>
             <div class="h-[320px]">
-                <canvas id="monthlyTrendChart"></canvas>
+                <canvas id="monthlyTrendChart">
+                </canvas>
             </div>
         </div>
     </div>
 </div>
-
 <script>
-    // Configuration common for both charts
     Chart.defaults.font.family = 'inherit';
     Chart.defaults.color = '#94a3b8';
-
-    // 1. Leave Distribution (Doughnut)
     const ctxPie = document.getElementById('leaveTypeChart').getContext('2d');
     new Chart(ctxPie, {
         type: 'doughnut',
         data: {
             labels: ['Annual', 'Medical', 'Emergency', 'Other'],
             datasets: [{
-                data: [45, 25, 15, 15], // Gantikan dengan data Flask {{ chart_data }}
+                data: [45, 25, 15, 15], 
                 backgroundColor: ['#3b82f6', '#10b981', '#f43f5e', '#f1f5f9'],
                 borderWidth: 8,
                 borderColor: '#ffffff',
@@ -121,20 +101,17 @@
             }
         }
     });
-
-    // 2. Monthly Trend (Line Chart)
     const ctxLine = document.getElementById('monthlyTrendChart').getContext('2d');
     const gradient = ctxLine.createLinearGradient(0, 0, 0, 300);
     gradient.addColorStop(0, 'rgba(59, 130, 246, 0.2)');
     gradient.addColorStop(1, 'rgba(59, 130, 246, 0)');
-
     new Chart(ctxLine, {
         type: 'line',
         data: {
             labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
             datasets: [{
                 label: 'Leaves Taken',
-                data: [12, 19, 15, 8, 22, 30], // Gantikan dengan data Flask
+                data: [12, 19, 15, 8, 22, 30], 
                 borderColor: '#3b82f6',
                 borderWidth: 4,
                 backgroundColor: gradient,
@@ -175,17 +152,14 @@
         }
     });
 </script>
-
 <style>
     .animate-fadeIn { 
         animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
     }
-    
     @keyframes fadeIn { 
         from { opacity: 0; transform: translateY(30px); filter: blur(10px); } 
         to { opacity: 1; transform: translateY(0); filter: blur(0); } 
     }
-
     @media print {
         .max-w-7xl { max-width: 100% !important; padding: 0 !important; }
         button, .animate-fadeIn { animation: none !important; }

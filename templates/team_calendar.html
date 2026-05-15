@@ -1,19 +1,14 @@
 {% extends "base.html" %}
-
 {% block title %}Team Calendar | TCK Leave{% endblock %}
-
 {% block content %}
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js"></script>
-
 <div class="max-w-7xl mx-auto px-6 pb-16 animate-fadeIn">
-    
     <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-8">
         <div>
             <span class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 mb-2 block">Management</span>
             <h1 class="text-5xl font-extrabold text-slate-900 tracking-tight">Team Calendar</h1>
             <p class="text-slate-500 font-medium mt-2 text-lg">Visualize team availability and scheduled leaves at a glance.</p>
         </div>
-
         <div class="flex flex-wrap gap-3 bg-white/70 backdrop-blur-2xl p-3 rounded-[1.8rem] border border-white shadow-xl shadow-slate-200/50">
             <div class="flex items-center px-4 py-2 bg-white rounded-xl shadow-sm border border-slate-50">
                 <span class="w-2.5 h-2.5 bg-blue-500 rounded-full mr-2 shadow-sm shadow-blue-200"></span>
@@ -29,41 +24,32 @@
             </div>
         </div>
     </div>
-
     <div class="bg-white/80 backdrop-blur-xl rounded-[3rem] border border-white shadow-2xl shadow-slate-200/60 p-6 md:p-12 overflow-hidden transition-all duration-500 hover:shadow-blue-900/5">
-        <div id="calendar" class="no-scrollbar"></div>
+        <div id="calendar" class="no-scrollbar">
+        </div>
     </div>
 </div>
-
 <style>
-    /* Premium Animations */
     .animate-fadeIn { 
         animation: fadeIn 1s cubic-bezier(0.16, 1, 0.3, 1) forwards; 
     }
-    
     @keyframes fadeIn { 
         from { opacity: 0; transform: translateY(30px); filter: blur(10px); } 
         to { opacity: 1; transform: translateY(0); filter: blur(0); } 
     }
-
-    /* FullCalendar Premium Overrides */
     :root {
         --fc-border-color: #f1f5f9;
         --fc-today-bg-color: rgba(37, 99, 235, 0.03);
         --fc-button-hover-bg-color: #f8fafc;
         --fc-button-hover-border-color: #e2e8f0;
     }
-
     .fc { font-family: inherit; border: none !important; }
-
-    /* Toolbar Typography & Buttons */
     .fc-toolbar-title {
         font-size: 1.5rem !important;
         font-weight: 900 !important;
         color: #0f172a !important;
         letter-spacing: -0.025em !important;
     }
-
     .fc-button-primary {
         background-color: white !important;
         border: 1px solid #e2e8f0 !important;
@@ -77,28 +63,22 @@
         transition: all 0.3s ease !important;
         box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05) !important;
     }
-
     .fc-button-primary:hover {
         background-color: #f8fafc !important;
         color: #0f172a !important;
         transform: translateY(-1px);
     }
-
     .fc-button-active {
         background-color: #0f172a !important;
         border-color: #0f172a !important;
         color: white !important;
         box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.1) !important;
     }
-
-    /* Calendar Grid Styling */
     .fc-theme-standard td, .fc-theme-standard th { border: 1px solid #f8fafc !important; }
-    
     .fc-col-header-cell {
         padding: 1.5rem 0 !important;
         background-color: #f8fafc / 50 !important;
     }
-
     .fc-col-header-cell-cushion {
         font-size: 10px !important;
         font-weight: 900 !important;
@@ -106,19 +86,15 @@
         letter-spacing: 0.2em !important;
         color: #94a3b8 !important;
     }
-
     .fc-daygrid-day-number {
         font-weight: 800 !important;
         color: #cbd5e1 !important;
         padding: 1.5rem !important;
         font-size: 11px !important;
     }
-
     .fc-day-today .fc-daygrid-day-number {
         color: #3b82f6 !important;
     }
-
-    /* Event UI Style */
     .fc-event {
         border: none !important;
         border-radius: 0.8rem !important;
@@ -128,30 +104,22 @@
         transition: transform 0.2s ease !important;
         cursor: pointer;
     }
-
     .fc-event:hover {
         transform: scale(1.02);
         z-index: 10;
     }
-
     .fc-event-title {
         font-weight: 800 !important;
         font-size: 9px !important;
         text-transform: uppercase !important;
         letter-spacing: 0.05em !important;
     }
-
-    /* Scrollbar */
     .no-scrollbar::-webkit-scrollbar { display: none; }
 </style>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const calendarEl = document.getElementById('calendar');
-        
-        // Data events dari Flask
         const leaveEvents = {{ events | tojson if events else '[]' }};
-
         const calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             headerToolbar: {
@@ -163,28 +131,22 @@
             dayMaxEvents: 3,
             events: leaveEvents,
             height: 'auto',
-            
             eventDidMount: function(info) {
                 const type = info.event.extendedProps.type ? info.event.extendedProps.type.toLowerCase() : '';
-                
-                // Color mapping based on leave type
                 if (type.includes('annual')) {
-                    info.el.style.backgroundColor = '#3b82f6'; // Blue
+                    info.el.style.backgroundColor = '#3b82f6'; 
                 } else if (type.includes('medical') || type.includes('mc')) {
-                    info.el.style.backgroundColor = '#f43f5e'; // Rose
+                    info.el.style.backgroundColor = '#f43f5e'; 
                 } else if (type.includes('emergency')) {
-                    info.el.style.backgroundColor = '#f59e0b'; // Amber
+                    info.el.style.backgroundColor = '#f59e0b'; 
                 } else {
-                    info.el.style.backgroundColor = '#64748b'; // Slate
+                    info.el.style.backgroundColor = '#64748b'; 
                 }
             },
-
             eventClick: function(info) {
-                // Future improvement: Open a custom iOS-style modal instead of alert
                 alert('Staff: ' + info.event.title + '\nType: ' + (info.event.extendedProps.type || 'N/A'));
             }
         });
-
         calendar.render();
     });
 </script>

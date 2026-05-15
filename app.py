@@ -2,39 +2,35 @@ import os
 import time
 from datetime import datetime, date, timedelta
 
-# Library Pihak Ketiga
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from werkzeug.security import generate_password_hash, check_password_hash
-from sqlalchemy import text  
+from sqlalchemy import text
+from flask import render_template, request, redirect, url_for, session, flash
+from werkzeug.security import check_password_hash
+from sqlalchemy import text
 
 app = Flask(__name__)
 app.permanent_session_lifetime = timedelta(minutes=30)
 app.secret_key = "tck_esolutions_secret"
 
-# --- KONFIGURASI DATABASE ---
-# Format: postgresql://username:password@localhost:port/nama_db
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://postgres:12345@localhost:5432/TCK_Leave_System'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Inisialisasi objek 'db'
-db = SQLAlchemy(app) 
+db = SQLAlchemy(app)
 
 UPLOAD_FOLDER = "static/uploads/mc_docs"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# =========================
-# HELPER: USER BALANCES (FIXED)
-# =========================
 def get_user_balances(emp_id):
     conn = get_db_connection()
     cur = conn.cursor()
     query = """
-    SELECT 
+    SELECT
         lt.type_id,
         lt.leave_name,
         lp.entitlement_days as total_entitlement,
@@ -55,24 +51,16 @@ def get_user_balances(emp_id):
     conn.close()
     return results
 
-# =========================
-# HELPER: LEAVE BALANCE
-# =========================
 def get_leave_balance(employee_id):
     query = """
-    SELECT lt.leave_name, 
+    SELECT lt.leave_name,
            (lt.default_entitlement - COALESCE(SUM(lr.duration), 0)) as balance
     FROM leave_types lt
-    LEFT JOIN leave_requests lr ON lr.leave_type_id = lt.type_id 
+    LEFT JOIN leave_requests lr ON lr.leave_type_id = lt.type_id
          AND lr.emp_id = %s AND lr.status = 'Approved'
     GROUP BY lt.type_id, lt.leave_name, lt.default_entitlement
     """
-    # Jalankan query menggunakan cursor db Alif
-    # Return dalam bentuk dictionary untuk senang guna di Dashboard
 
-# =========================
-# DATABASE
-# =========================
 def get_db_connection():
     return psycopg2.connect(
         host="localhost",
@@ -82,9 +70,6 @@ def get_db_connection():
         cursor_factory=RealDictCursor
     )
 
-# =========================
-# HELPER: POLICY ENGINE
-# =========================
 def get_leave_policy(emp_id):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -114,10 +99,7 @@ def get_leave_policy(emp_id):
         }
 
     return {"annual": 14, "medical": 14}
-
-# =========================
-# HELPER: DURATION
-# =========================
+            
 def calculate_duration(start_date, end_date, is_half_day):
     d1 = datetime.strptime(start_date, "%Y-%m-%d")
     d2 = datetime.strptime(end_date, "%Y-%m-%d")
@@ -127,9 +109,7 @@ def calculate_duration(start_date, end_date, is_half_day):
 
     days = 0
     while d1 <= d2:
-        # skip Sunday
         if d1.weekday() != 6:
-            # Saturday = 0.5
             if d1.weekday() == 5:
                 days += 0.5
             else:
@@ -138,9 +118,6 @@ def calculate_duration(start_date, end_date, is_half_day):
 
     return days
 
-# =========================
-# HELPER: LOGGING
-# =========================
 def log_action(emp_id, action, details):
     conn = get_db_connection()
     cur = conn.cursor()
@@ -164,184 +141,238 @@ def log_action(emp_id, action, details):
         cur.close()
         conn.close()
 
-
-
-# =========================
-# AUTH - REPAIRED
-# =========================
-@app.route("/login", methods=["GET", "POST"])
+@app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'emp_id' in session:
-        return redirect(url_for("dashboard"))
+        return redirect(url_for('dashboard'))
 
-    if request.method == "POST":
-        email = request.form.get("email")
-        password_form = request.form.get("password")
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
 
-        conn = get_db_connection()
-        cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        user_query = text("""
+            SELECT emp_id, email, password_hash, role, full_name
+            FROM employees
+            WHERE email = :email AND is_active = TRUE
+        """)
+        user = db.session.execute(user_query, {"email": email}).fetchone()
 
-        try:
-            cur.execute(
-                "SELECT * FROM employees WHERE email=%s AND is_active = TRUE",
-                (email,)
-            )
-            user = cur.fetchone()
+        if user:
+            if check_password_hash(user.password_hash, password):
+                session.clear()
+                session['emp_id'] = user.emp_id
+                session['role'] = user.role
+                session['full_name'] = user.full_name
+                return redirect(url_for('dashboard'))
+            else:
+                flash("Kata laluan salah.", "danger")
+        else:
+            flash("Akaun tidak dijumpai atau tidak aktif.", "danger")
 
-            if user and check_password_hash(user["password_hash"], password_form):
+    return render_template('login.html')
 
-                # =========================
-                # FIXED SESSION
-                # =========================
-                session["emp_id"] = user["emp_id"]
-                session["name"] = user["full_name"]
-                session["role"] = user["role"] if user["role"] else "Staff"
-                session["dept_id"] = user["dept_id"]
-
-                session.permanent = True
-
-                record_activity(
-                    'LOGIN_SUCCESS',
-                    f'User {email} logged in successfully',
-                    user["emp_id"]
-                )
-
-                return redirect(url_for("dashboard"))
-
-            if user:
-                record_activity(
-                    'LOGIN_FAILED',
-                    f'Failed login attempt for {email}',
-                    user["emp_id"]
-                )
-
-            flash("E-mel atau kata laluan salah / Akaun tidak aktif.", "danger")
-
-        except Exception as e:
-            print(f"Database Error: {e}")
-            flash("Ralat teknikal berlaku semasa login.", "danger")
-
-        finally:
-            cur.close()
-            conn.close()
-
-    return render_template("login.html")
-
-
-# =========================
-# DASHBOARD
-# =========================
-@app.route("/dashboard")
+@app.route('/dashboard')
 def dashboard():
     if 'emp_id' not in session:
-        return redirect(url_for("login"))
+        return redirect(url_for('login'))
 
     emp_id = session['emp_id']
 
-    conn = get_db_connection()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    user_query = text("""
+        SELECT e.*, d.dept_name, m.full_name as manager_name
+        FROM employees e
+        LEFT JOIN departments d ON e.dept_id = d.dept_id
+        LEFT JOIN employees m ON e.manager_id = m.emp_id
+        WHERE e.emp_id = :id
+    """)
+    user_data = db.session.execute(user_query, {"id": emp_id}).mappings().first()
 
-    try:
-        cur.execute("""
-            SELECT e.full_name, e.role, d.dept_name
-            FROM employees e
-            LEFT JOIN departments d ON e.dept_id = d.dept_id
-            WHERE e.emp_id = %s
-        """, (emp_id,))
-        user_info = cur.fetchone()
+    if not user_data:
+        return "User not found", 404
 
-        cur.execute("""
-            SELECT
-                COUNT(*) FILTER (WHERE status='Pending') AS pending_count,
-                COUNT(*) FILTER (WHERE status='Approved') AS approved_count,
-                COUNT(*) FILTER (WHERE status='Rejected') AS rejected_count
-            FROM leave_requests
-            WHERE emp_id=%s
-        """, (emp_id,))
-        stats = cur.fetchone()
+    user_role = user_data['role']
 
-        cur.execute("""
-            SELECT
-                (
-                    COALESCE(lt.default_entitlement, 14)
-                    -
-                    COALESCE(SUM(lr.duration), 0)
-                ) AS balance
-
-            FROM leave_types lt
-
-            LEFT JOIN leave_requests lr
-                ON lr.leave_type_id = lt.type_id
-                AND lr.emp_id = %s
-                AND lr.status = 'Approved'
-
-            WHERE lt.type_id = 1
-
-            GROUP BY lt.default_entitlement
-        """, (emp_id,))
-
-        annual_balance = cur.fetchone()
-
-        cur.execute("""
-            SELECT 
-                lr.*,
-                lt.leave_name
-            FROM leave_requests lr
-            JOIN leave_types lt
-                ON lr.leave_type_id = lt.type_id
-            WHERE lr.emp_id=%s
-            ORDER BY lr.created_at DESC
-            LIMIT 5
-        """, (emp_id,))
-        recent_requests = cur.fetchall()
-
-    except Exception as e:
-        print(f"Dashboard Error: {e}")
-
-        stats = {
-            'pending_count': 0,
-            'approved_count': 0,
-            'rejected_count': 0
+    # ROLE: ADMIN
+    if user_role == 'Admin':
+        admin_stats = {
+            'total_employees': db.session.execute(text("SELECT COUNT(*) FROM employees")).scalar(),
+            'pending_count': db.session.execute(text("SELECT COUNT(*) FROM leave_requests WHERE status = 'Pending'")).scalar(),
+            'on_leave_today': db.session.execute(
+                text("SELECT COUNT(*) FROM leave_requests WHERE status = 'Approved' AND CURRENT_DATE BETWEEN start_date AND end_date")
+            ).scalar()
         }
 
-        annual_balance = {'balance': 0}
-        recent_requests = []
-        user_info = None
+        all_employees = db.session.execute(
+            text("""
+                SELECT e.*, d.dept_name
+                FROM employees e
+                LEFT JOIN departments d ON e.dept_id = d.dept_id
+                ORDER BY e.joined_date DESC
+            """)
+        ).mappings().all()
 
-    finally:
-        cur.close()
-        conn.close()
+        departments = db.session.execute(text("SELECT * FROM departments")).mappings().all()
 
-    return render_template(
-        "dashboard.html",
-        stats=stats,
-        recent_requests=recent_requests,
-        annual_balance=annual_balance['balance'] if annual_balance else 0,
-        user_info=user_info, active_page='dashboard'
-    )
+        return render_template('dashboard_admin.html',
+                               user=user_data,
+                               all_employees=all_employees,
+                               departments=departments,
+                               active_page='dashboard',
+                               **admin_stats)
 
-# =========================
-# APPLY LEAVE
-# =========================
+  # ROLE: OFFICER / SUPERVISOR
+    elif user_role in ['CTO', 'COO']:
+        today_date = datetime.now()
+        current_dept_id = user_data.get('dept_id')
+
+        if current_dept_id:
+            # 1. Stats pending (Kekal sama)
+            pending_count = db.session.execute(
+                text("""
+                    SELECT COUNT(*) FROM leave_requests l 
+                    JOIN employees e ON l.emp_id = e.emp_id 
+                    WHERE l.status = 'Pending' AND e.dept_id = :d
+                """), {"d": current_dept_id}
+            ).scalar()
+
+            # 2. Stats bercuti hari ini (Kekal sama)
+            on_leave_today = db.session.execute(
+                text("""
+                    SELECT COUNT(*) FROM leave_requests l
+                    JOIN employees e ON l.emp_id = e.emp_id
+                    WHERE l.status = 'Approved' 
+                    AND e.dept_id = :d
+                    AND CURRENT_DATE BETWEEN l.start_date AND l.end_date
+                """), {"d": current_dept_id}
+            ).scalar()
+
+            # 3. FIX: Department Size (Hanya kira 'Staff')
+            # Ditambah syarat AND role = 'Staff'
+            team_count = db.session.execute(
+                text("""
+                    SELECT COUNT(*) 
+                    FROM employees 
+                    WHERE dept_id = :d AND role = 'Staff'
+                """), {"d": current_dept_id}
+            ).scalar()
+
+            # 4. Recent Activity (Kekal sama)
+            recent_requests = db.session.execute(
+                text("""
+                    SELECT lr.*, e.full_name, e.role, lt.leave_name
+                    FROM leave_requests lr
+                    JOIN employees e ON lr.emp_id = e.emp_id
+                    JOIN leave_types lt ON lr.leave_type_id = lt.type_id
+                    WHERE e.dept_id = :d
+                    ORDER BY lr.created_at DESC LIMIT 5
+                """), {"d": current_dept_id}
+            ).mappings().all()
+            
+        else:
+            pending_count = on_leave_today = team_count = 0
+            recent_requests = []
+
+        return render_template('dashboard_officer.html',
+                               user=user_data,
+                               today=today_date,
+                               pending_count=pending_count,
+                               on_leave_today=on_leave_today,
+                               team_count=team_count,
+                               active_page='dashboard',
+                               recent_requests=recent_requests)
+    
+    # ROLE: STAFF
+    elif user_role == 'Staff':
+        # A. Balances
+        balances = db.session.execute(text("""
+            SELECT 
+                lt.type_id,
+                lt.leave_name,
+                lt.default_entitlement as entitlement_days,
+                lt.default_entitlement as remaining_days 
+            FROM leave_types lt
+            WHERE lt.is_active = true
+        """)).mappings().all()
+
+        # B. Stats (Menggunakan standard CASE WHEN demi keandalan merentasi pelbagai jenis DB)
+        staff_stats = db.session.execute(
+            text("""
+                SELECT 
+                    SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
+                    SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved
+                FROM leave_requests 
+                WHERE emp_id = :id
+            """),
+            {"id": emp_id}
+        ).mappings().first()
+
+        # C. Personal History
+        personal_requests = db.session.execute(
+            text("""
+                SELECT lr.*, lt.leave_name
+                FROM leave_requests lr
+                JOIN leave_types lt ON lr.leave_type_id = lt.type_id
+                WHERE lr.emp_id = :id
+                ORDER BY lr.created_at DESC LIMIT 5
+            """),
+            {"id": emp_id}
+        ).mappings().all()
+
+        # D. Ambil data Events untuk Kalendar
+        calendar_data = db.session.execute(
+            text("""
+                SELECT 
+                    e.full_name as title,
+                    l.start_date as start,
+                    l.end_date as end,
+                    lt.leave_name as type
+                FROM leave_requests l
+                JOIN employees e ON l.emp_id = e.emp_id
+                JOIN leave_types lt ON l.leave_type_id = lt.type_id
+                WHERE e.dept_id = :dept_id AND l.status = 'Approved'
+            """),
+            {"dept_id": user_data['dept_id']}
+        ).mappings().all()
+
+        # Tukar format date kepada string ISO untuk FullCalendar
+        events = []
+        for row in calendar_data:
+            events.append({
+                "title": row['title'],
+                "start": row['start'].strftime('%Y-%m-%d') if row['start'] else '',
+                "end": (row['end'] + timedelta(days=1)).strftime('%Y-%m-%d') if row['end'] else '',
+                "extendedProps": {"type": row['type']}
+            })
+
+        return render_template('dashboard_staff.html', 
+                               user=user_data, 
+                               balances=balances, 
+                               stats=staff_stats,
+                               requests=personal_requests,
+                               active_page='dashboard',
+                               events=events) 
+
+    # ROLE: FINANCE DIRECTOR
+    elif user_role == 'Finance Director':
+        return render_template('dashboard_finance.html', user=user_data, active_page='dashboard')
+
+    return "Role not recognized", 403
+
 @app.route('/apply', methods=['GET', 'POST'])
 def apply_leave():
-    # 1. Semak Sesi (Guna 'user_id' untuk konsistensi dengan login)
     if 'emp_id' not in session:
         flash("Sila login terlebih dahulu.", "warning")
         return redirect(url_for('login'))
 
     if request.method == 'POST':
-        # 2. Ambil data dari borang HTML
         leave_type_name = request.form.get('leave_type')
         start_date = request.form.get('start_date')
         end_date = request.form.get('end_date')
         reason = request.form.get('reason')
-        is_half_day = request.form.get('half_day') == 'on'  # Checkbox returns 'on'
-        
-        # Gunakan helper function anda untuk kira durasi yang tepat (termasuk Sabtu 0.5)
+        is_half_day = request.form.get('half_day') == 'on'
+
         duration = calculate_duration(start_date, end_date, is_half_day)
 
-        # 3. Mapping Nama Cuti ke ID Database (Sesuai skema PostgreSQL anda)
         leave_type_map = {'Annual': 1, 'Medical': 2, 'Emergency': 3, 'Unpaid': 4}
         leave_type_id = leave_type_map.get(leave_type_name, 1)
 
@@ -349,19 +380,17 @@ def apply_leave():
         cur = conn.cursor()
 
         try:
-            # 4. Ambil Approver ID (Manager) berdasarkan dept_id pengguna
             cur.execute("SELECT manager_id FROM employees WHERE emp_id = %s", (session['emp_id'],))
             user_info = cur.fetchone()
             approver_id = user_info['manager_id'] if user_info else None
 
-            # 5. Masukkan ke dalam database leave_requests
             cur.execute("""
                 INSERT INTO leave_requests (
-                    emp_id, leave_type_id, start_date, end_date, 
+                    emp_id, leave_type_id, start_date, end_date,
                     reason, status, approver_id, duration, is_half_day
                 ) VALUES (%s, %s, %s, %s, %s, 'Pending', %s, %s, %s)
             """, (
-                session['emp_id'], leave_type_id, start_date, end_date, 
+                session['emp_id'], leave_type_id, start_date, end_date,
                 reason, approver_id, duration, is_half_day
             ))
 
@@ -377,13 +406,9 @@ def apply_leave():
             cur.close()
             conn.close()
 
-    # --- BAHAGIAN GET (MEMAPARKAN BORANG) ---
-    # 6. Ambil data user secara lengkap untuk dihantar ke apply.html
-    # --- BAHAGIAN GET (MEMAPARKAN BORANG) ---
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    
-    # Query ini menggunakan LEFT JOIN biasa, tidak perlu fungsi di PostgreSQL
+
     cur.execute("""
         SELECT
             e.*,
@@ -421,29 +446,23 @@ def apply_leave():
 
         WHERE e.emp_id = %s
     """, (session['emp_id'],))
-    
+
     user_data = cur.fetchone()
     cur.close()
     conn.close()
 
     return render_template('apply.html', user=user_data, active_page='apply')
 
-# =========================
-# VIEW RECORDS (ADD THIS)
-# =========================
 @app.route('/records')
 def records():
-    # 1. Semak sesi guna emp_id (seperti di dashboard)
     if 'emp_id' not in session:
         return redirect(url_for('login'))
-    
+
     emp_id = session.get('emp_id')
 
-    # 2. Ambil data dari database (PostgreSQL)
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=RealDictCursor)
-    
-    # Query untuk ambil semua rekod cuti bagi pekerja ini
+
     query = """
         SELECT lr.*, lt.leave_name as leave_type
         FROM leave_requests lr
@@ -453,21 +472,16 @@ def records():
     """
     cur.execute(query, (emp_id,))
     leave_history = cur.fetchall()
-    
+
     cur.close()
     conn.close()
 
-    # 3. Hantar data ke template
-    return render_template('records.html', 
-                           leave_history=leave_history, 
+    return render_template('records.html',
+                           leave_history=leave_history,
                            active_page='records')
 
-# =========================
-# USER PROFILE
-# =========================
 @app.route('/profile', methods=['GET', 'POST'])
 def profile():
-    # Pastikan guna 'emp_id' supaya sync dengan Login
     if 'emp_id' not in session:
         flash("Sila login terlebih dahulu.", "warning")
         return redirect(url_for('login'))
@@ -477,42 +491,35 @@ def profile():
     cur = conn.cursor(cursor_factory=RealDictCursor)
 
     try:
-        # =========================
-        # PROSES UPDATE (POST)
-        # =========================
         if request.method == 'POST':
             action = request.form.get('action')
             if action == 'update_info':
                 cur.execute("""
-                    UPDATE employees SET 
+                    UPDATE employees SET
                     emergency_name = %s, emergency_relation = %s, emergency_phone = %s
                     WHERE emp_id = %s
-                """, (request.form.get('emergency_name'), request.form.get('emergency_relation'), 
+                """, (request.form.get('emergency_name'), request.form.get('emergency_relation'),
                       request.form.get('emergency_phone'), emp_id))
                 conn.commit()
                 flash("Maklumat kecemasan berjaya dikemaskini.", "success")
 
-        # =========================
-        # AMBIL DATA PROFIL (GET)
-        # =========================
-        # Saya sesuaikan query ini dengan struktur DB anda yang sebenar
         cur.execute("""
-            SELECT 
-                e.*, 
-                d.dept_name, 
-                d.dept_code, 
+            SELECT
+                e.*,
+                d.dept_name,
+                d.dept_code,
                 m.full_name AS manager_name,
                 -- Ambil baki cuti tahunan (Annual Leave - ID 1) dari leave_types
                 COALESCE(lt.default_entitlement, 14) AS total_leave,
                 -- Kira jumlah cuti yang telah lulus (Approved)
                 COALESCE((
-                    SELECT SUM(duration) FROM leave_requests 
+                    SELECT SUM(duration) FROM leave_requests
                     WHERE emp_id = e.emp_id AND status = 'Approved' AND leave_type_id = 1
                 ), 0) AS used_leave,
                 -- Status sama ada sedang cuti hari ini
                 EXISTS (
-                    SELECT 1 FROM leave_requests lr 
-                    WHERE lr.emp_id = e.emp_id AND lr.status = 'Approved' 
+                    SELECT 1 FROM leave_requests lr
+                    WHERE lr.emp_id = e.emp_id AND lr.status = 'Approved'
                     AND CURRENT_DATE BETWEEN lr.start_date AND lr.end_date
                 ) AS on_leave
             FROM employees e
@@ -521,10 +528,9 @@ def profile():
             LEFT JOIN leave_types lt ON lt.type_id = 1 -- Merujuk kepada Annual Leave
             WHERE e.emp_id = %s
         """, (emp_id,))
-        
+
         user_info = cur.fetchone()
 
-        # JIKA DATA MASIH TIADA (Safety Check)
         if not user_info:
             flash("Data profil tidak dijumpai.", "danger")
             return redirect(url_for('dashboard'))
@@ -544,9 +550,6 @@ def profile():
         active_page='profile'
     )
 
-# =========================
-# APPROVAL (DYNAMIC - NO DEDUCTION NEEDED)
-# =========================
 @app.route("/approve/<int:id>", methods=["POST"])
 def approve(id):
     if 'emp_id' not in session:
@@ -555,14 +558,12 @@ def approve(id):
     conn = get_db_connection()
     cur = conn.cursor()
 
-    # HANYA UPDATE STATUS. Baki akan berubah sendiri di dashboard staf.
     cur.execute("""
         UPDATE leave_requests
         SET status='Approved', approved_at=NOW()
         WHERE request_id=%s AND status='Pending'
     """, (id,))
-    
-    # Rekod ke System Logs (Audit Trail)
+
     log_action(session['emp_id'], 'APPROVE_LEAVE', f'Approved request ID: {id}')
 
     conn.commit()
@@ -572,9 +573,6 @@ def approve(id):
     flash("Permohonan diluluskan. Baki dikemaskini secara dinamik.", "success")
     return redirect(url_for("dashboard"))
 
-# =========================
-# REJECT
-# =========================
 @app.route("/reject/<int:id>", methods=["POST"])
 def reject(id):
     conn = get_db_connection()
@@ -593,15 +591,9 @@ def reject(id):
     flash("Rejected", "warning")
     return redirect(url_for("dashboard"))
 
-# =========================
-# APPROVE/REJECT WITH REMARKS
-# =========================
 @app.route("/approve_reject_leave/<int:request_id>", methods=["POST"])
 def approve_reject_leave(request_id):
 
-    # =========================
-    # SECURITY CHECK
-    # =========================
     if 'emp_id' not in session or session.get('role') == 'Staff':
         return jsonify({"error": "Unauthorized"}), 403
 
@@ -615,9 +607,6 @@ def approve_reject_leave(request_id):
 
     try:
 
-        # =========================
-        # VALIDATE ACTION
-        # =========================
         if action == "approve":
             status = "Approved"
             flash_msg = "Permohonan cuti telah diluluskan."
@@ -630,9 +619,6 @@ def approve_reject_leave(request_id):
             flash("Tindakan tidak sah.", "danger")
             return redirect(url_for("pending_approvals"))
 
-        # =========================
-        # CHECK REQUEST EXIST
-        # =========================
         cur.execute("""
             SELECT request_id, status
             FROM leave_requests
@@ -645,16 +631,10 @@ def approve_reject_leave(request_id):
             flash("Permohonan cuti tidak dijumpai.", "danger")
             return redirect(url_for("pending_approvals"))
 
-        # =========================
-        # PREVENT DOUBLE APPROVAL
-        # =========================
         if leave_request['status'] != 'Pending':
             flash("Permohonan ini telah diproses sebelum ini.", "warning")
             return redirect(url_for("pending_approvals"))
 
-        # =========================
-        # UPDATE LEAVE REQUEST
-        # =========================
         cur.execute("""
             UPDATE leave_requests
             SET
@@ -670,9 +650,6 @@ def approve_reject_leave(request_id):
             request_id
         ))
 
-        # =========================
-        # SYSTEM LOG
-        # =========================
         log_action(
             approver_id,
             'LEAVE_DECISION',
@@ -698,40 +675,113 @@ def approve_reject_leave(request_id):
         cur.close()
         conn.close()
 
-    return redirect(url_for("pending_approvals"))
+    return redirect(url_for("team_history"))
 
-# =========================
-# PENDING APPROVALS (FIXED SESSION & DB)
 @app.route("/pending_approvals")
 def pending_approvals():
-    # Pastikan hanya pengurusan (Manager, SV, CTO, etc) boleh akses
-    if 'emp_id' not in session or session.get('role') == 'Staff':
-        flash("Anda tidak mempunyai kebenaran untuk akses halaman ini.", "danger")
+
+    if 'emp_id' not in session:
+        flash("Please login first.", "warning")
+        return redirect(url_for("login"))
+
+    if session.get('role') == 'Staff':
+        flash("Anda tidak mempunyai kebenaran.", "danger")
         return redirect(url_for("dashboard"))
+
+    approver_id = session['emp_id']
+    role = session.get('role')
 
     conn = get_db_connection()
     cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
-    # Query untuk mendapatkan detail pemohon dan maklumat cuti
-    cur.execute("""
-        SELECT lr.*, e.full_name, e.role 
-        FROM leave_requests lr
-        JOIN employees e ON lr.emp_id = e.emp_id
-        WHERE lr.status = 'Pending'
-        ORDER BY lr.created_at DESC
-    """)
-    pending_list = cur.fetchall()
+    try:
 
-    cur.close()
-    conn.close()
+        if role in ['CTO', 'COO']:
 
-    return render_template("pending_approvals.html", 
-                           pending_leaves=pending_list, 
-                           active_page='pending_approvals')
+            cur.execute("""
+                SELECT
+                    lr.request_id,
+                    lr.emp_id,
+                    lr.start_date,
+                    lr.end_date,
+                    lr.reason,
+                    lr.status,
+                    lr.duration,
+                    lr.created_at,
+                    lr.mc_path,
 
-# =========================
-# TEAM CALENDAR
-# =========================
+                    e.full_name,
+                    e.role,
+
+                    lt.leave_name
+
+                FROM leave_requests lr
+
+                JOIN employees e
+                    ON lr.emp_id = e.emp_id
+
+                LEFT JOIN leave_types lt
+                    ON lr.leave_type_id = lt.type_id
+
+                WHERE lr.status = 'Pending'
+
+                ORDER BY lr.created_at DESC
+            """)
+
+        else:
+
+            cur.execute("""
+                SELECT
+                    lr.request_id,
+                    lr.emp_id,
+                    lr.start_date,
+                    lr.end_date,
+                    lr.reason,
+                    lr.status,
+                    lr.duration,
+                    lr.created_at,
+                    lr.mc_path,
+
+                    e.full_name,
+                    e.role,
+
+                    lt.leave_name
+
+                FROM leave_requests lr
+
+                JOIN employees e
+                    ON lr.emp_id = e.emp_id
+
+                LEFT JOIN leave_types lt
+                    ON lr.leave_type_id = lt.type_id
+
+                WHERE lr.status = 'Pending'
+                AND e.manager_id = %s
+
+                ORDER BY lr.created_at DESC
+            """, (approver_id,))
+
+        pending_list = cur.fetchall()
+
+    except Exception as e:
+
+        print(f"PENDING APPROVAL ERROR: {e}")
+
+        flash("Unable to load pending approvals.", "danger")
+
+        pending_list = []
+
+    finally:
+
+        cur.close()
+        conn.close()
+
+    return render_template(
+        "pending_approvals.html",
+        pending_leaves=pending_list,
+        active_page='pending_approvals'
+    )
+
 @app.route("/team-calendar")
 def team_calendar():
 
@@ -786,14 +836,10 @@ def team_calendar():
         active_page='team_calendar'
     )
 
-
-# =========================
-# TEAM HISTORY
-# =========================
 @app.route("/team-history")
 def team_history():
 
-    if 'emp_id' not in session or session.get('role') == 'Staff':
+    if 'emp_id' not in session :
         flash("Anda tidak mempunyai kebenaran untuk akses halaman ini.", "danger")
         return redirect(url_for("dashboard"))
 
@@ -838,9 +884,6 @@ def team_history():
         active_page='team_history'
     )
 
-# =========================
-# REPORTS
-# =========================
 @app.route("/reports")
 def reports():
 
@@ -938,20 +981,15 @@ def reports():
         active_page='reports'
     )
 
-# =========================
-# MANAGE USERS (FULL REPAIR)
-# =========================
 @app.route('/manage_users', methods=['GET', 'POST'])
 def manage_users():
     if request.method == 'POST':
         action = request.form.get('action')
-        
-        # Logik Tambah Pekerja Baru
+
         if action == 'add':
             full_name = request.form.get('full_name')
             email = request.form.get('email')
-            password = request.form.get('password')
-            hashed_password = generate_password_hash(password)
+            password_hash = request.form.get('password_hash')
             dept_id = request.form.get('dept_id')
             role = request.form.get('role')
             manager_id = request.form.get('manager_id') or None
@@ -962,7 +1000,7 @@ def manage_users():
                     INSERT INTO employees (full_name, email, password_hash, dept_id, role, manager_id, joined_date, is_active)
                     VALUES (:full_name, :email, :password_hash, :dept_id, :role, :manager_id, :joined_date, TRUE)
                 """), {
-                    "full_name": full_name, "email": email, "password_hash": hashed_password,
+                    "full_name": full_name, "email": email, "password_hash": password_hash,
                     "dept_id": dept_id, "role": role, "manager_id": manager_id, "joined_date": joined_date
                 })
                 db.session.commit()
@@ -971,22 +1009,22 @@ def manage_users():
                 db.session.rollback()
                 flash(f'Error adding employee: {str(e)}', 'danger')
 
-        # Logik Kemaskini Pekerja (Edit)
         elif action == 'edit':
             emp_id = request.form.get('emp_id')
             full_name = request.form.get('full_name')
             email = request.form.get('email')
+            password_hash = request.form.get('password_hash')
             dept_id = request.form.get('dept_id')
             role = request.form.get('role')
             manager_id = request.form.get('manager_id') or None
-            
+
             try:
                 db.session.execute(text("""
-                    UPDATE employees 
-                    SET full_name = :full_name, email = :email, dept_id = :dept_id, role = :role, manager_id = :manager_id
+                    UPDATE employees
+                    SET full_name = :full_name, email = :email, password_hash = :password_hash, dept_id = :dept_id, role = :role, manager_id = :manager_id
                     WHERE emp_id = :emp_id
                 """), {
-                    "full_name": full_name, "email": email, "dept_id": dept_id, 
+                    "full_name": full_name, "email": email, "dept_id": dept_id,
                     "role": role, "manager_id": manager_id, "emp_id": emp_id
                 })
                 db.session.commit()
@@ -997,57 +1035,45 @@ def manage_users():
 
         return redirect(url_for('manage_users'))
 
-    # --- BAHAGIAN GET (Paparan Data) ---
-    
-    # 1. Senarai Users (Tukar tarikh ke string & RowMapping ke dict)
     users_raw = db.session.execute(text("""
-        SELECT 
+        SELECT
             e.emp_id, e.full_name, e.email, e.role, e.dept_id, e.manager_id, e.is_active,
-            TO_CHAR(e.joined_date, 'YYYY-MM-DD') as joined_date, 
-            d.dept_name 
-        FROM employees e 
+            TO_CHAR(e.joined_date, 'YYYY-MM-DD') as joined_date,
+            d.dept_name
+        FROM employees e
         LEFT JOIN departments d ON e.dept_id = d.dept_id
         ORDER BY e.emp_id DESC
     """)).mappings().all()
     users = [dict(row) for row in users_raw]
 
-    # 2. Senarai Departments (Tukar ke dict)
     depts_raw = db.session.execute(text("SELECT * FROM departments ORDER BY dept_name ASC")).mappings().all()
     departments = [dict(row) for row in depts_raw]
 
-    # 3. Senarai Managers (Tukar ke dict)
     mgr_raw = db.session.execute(text("""
-        SELECT emp_id, full_name 
-        FROM employees 
-        WHERE role IN ('Admin', 'Supervisor', 'Manager')
+        SELECT emp_id, full_name
+        FROM employees
+        WHERE role IN ('Admin', 'CTO', 'COO', 'Manager')
         ORDER BY full_name ASC
     """)).mappings().all()
     managers = [dict(row) for row in mgr_raw]
 
-    return render_template('manage_users.html', 
-                           users=users, 
-                           departments=departments, 
+    return render_template('manage_users.html',
+                           users=users,
+                           departments=departments,
                            managers=managers, active_page='manage_users')
 
-# =========================
-# DELETE USER
-# =========================
 @app.route('/delete_user/<int:id>', methods=['POST'])
 def delete_user(id):
-    # Pastikan hanya Admin boleh padam
     if 'emp_id' not in session or session.get('role') != 'Admin':
         flash("Unauthorized access.", "danger")
         return redirect(url_for('manage_users'))
 
     try:
-        # 1. Dapatkan nama user untuk log sebelum padam (opsyenal)
         user = db.session.execute(text("SELECT full_name FROM employees WHERE emp_id = :id"), {"id": id}).mappings().first()
-        
-        # 2. Padam user
+
         db.session.execute(text("DELETE FROM employees WHERE emp_id = :id"), {"id": id})
         db.session.commit()
 
-        # 3. Rekod dalam log sistem
         if user:
             record_activity('DELETE_USER', f"Deleted user: {user['full_name']} (ID: {id})", session.get('emp_id'))
 
@@ -1058,10 +1084,6 @@ def delete_user(id):
 
     return redirect(url_for('manage_users'))
 
-
-# =========================
-# SYSTEM LOGS
-# =========================
 @app.route('/system_logs')
 def system_logs():
 
@@ -1093,9 +1115,6 @@ def system_logs():
         active_page='system_logs'
     )
 
-
-# =========================
-# HELPER: REKOD AKTIVITI KE SYSTEM LOGS
 def record_activity(action, details, emp_id=None):
 
     ip_addr = request.remote_addr
@@ -1127,102 +1146,84 @@ def record_activity(action, details, emp_id=None):
 
     db.session.commit()
 
-# ==========================================
-# MANAGE DEPARTMENTS (FULL ROUTE)
-# ==========================================
 @app.route('/manage_departments', methods=['GET', 'POST'])
 def manage_departments():
-    # Pastikan hanya Admin/Management boleh akses (Pilihan)
+    # 1. Kawalan Akses: Hanya Admin, Finance Director, COO, atau CTO boleh akses
     if 'emp_id' not in session or session.get('role') == 'Staff':
         flash("Anda tidak mempunyai kebenaran untuk akses halaman ini.", "danger")
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
-        # 1. Logik Tambah Jabatan Baru
         dept_name = request.form.get('dept_name')
-        
+
         if dept_name:
             try:
-                # Guna text() dan db.session untuk masukkan data
+                # Tambah jabatan baru ke dalam pangkalan data
                 db.session.execute(text("""
                     INSERT INTO departments (dept_name) 
                     VALUES (:name)
                 """), {"name": dept_name})
                 db.session.commit()
-                
-                # Rekod aktiviti ke system logs
+
+                # Rekod aktiviti untuk tujuan audit
                 record_activity('ADD_DEPARTMENT', f'Added new department: {dept_name}', session.get('emp_id'))
+                flash(f'Jabatan "{dept_name}" berjaya didaftarkan!', 'success')
                 
-                flash(f'Department "{dept_name}" has been successfully created!', 'success')
             except Exception as e:
                 db.session.rollback()
-                flash('Error creating department. It might already exist.', 'danger')
-        
+                flash('Ralat: Jabatan mungkin sudah wujud atau masalah pangkalan data.', 'danger')
+
         return redirect(url_for('manage_departments'))
 
-    # 2. Ambil data untuk paparan (GET)
-    # Query ini mengira bilangan staf secara dinamik menggunakan LEFT JOIN
+    # 2. Query Penapisan Staff (Hanya kira Role 'Staff')
+    # Menggunakan FILTER (WHERE e.role = 'Staff') supaya COO/CTO tidak dikira dalam jumlah
     departments = db.session.execute(text("""
         SELECT 
             d.dept_id, 
             d.dept_name, 
-            COUNT(e.emp_id) as staff_count
+            COUNT(e.emp_id) FILTER (WHERE e.role = 'Staff') as staff_count
         FROM departments d
         LEFT JOIN employees e ON d.dept_id = e.dept_id
         GROUP BY d.dept_id, d.dept_name
-        ORDER BY d.dept_name ASC
-    """)).mappings().all() # Gunakan mappings().all() untuk konsistensi data
+        ORDER BY d.dept_id ASC
+    """)).mappings().all()
 
-    return render_template('manage_departments.html', departments=departments, active_page='manage_departments')
+    return render_template('manage_departments.html', 
+                           departments=departments, 
+                           active_page='manage_departments')
 
-# ==========================================
-# DELETE DEPARTMENT
-# ==========================================
 @app.route('/delete_department/<int:dept_id>', methods=['POST'])
 def delete_department(dept_id):
     if 'emp_id' not in session or session.get('role') == 'Staff':
         return jsonify({"error": "Unauthorized"}), 403
 
     try:
-        # Semak jika ada staf dalam jabatan ini sebelum padam
         check_staff = db.session.execute(text("SELECT COUNT(*) FROM employees WHERE dept_id = :id"), {"id": dept_id}).scalar()
-        
+
         if check_staff > 0:
             flash('Cannot delete department that still has active employees. Reassign them first.', 'danger')
         else:
             db.session.execute(text("DELETE FROM departments WHERE dept_id = :id"), {"id": dept_id})
             db.session.commit()
-            
+
             record_activity('DELETE_DEPARTMENT', f'Deleted department ID: {dept_id}', session.get('emp_id'))
             flash('Department deleted successfully.', 'success')
-            
+
     except Exception as e:
         db.session.rollback()
         flash(f'Error deleting department: {str(e)}', 'danger')
-        
+
     return redirect(url_for('manage_departments'))
 
-# =========================
 @app.route('/')
 def index():
-    return redirect(url_for('login')) # Menghala ke halaman login secara automatik
-
-# =========================
-# LOGOUT
-# =========================
-@app.route('/logout')
-def logout():
-    # Mengosongkan semua data dalam session
-    session.clear()
-    
-    # Memberi maklum balas visual (opsyenal jika anda menggunakan flask-flash)
-    # flash("You have been logged out successfully.", "info")
-    
-    # Menghantar pengguna kembali ke halaman login
     return redirect(url_for('login'))
 
-# =========================
-# RUN
-# =========================
+@app.route('/logout')
+def logout():
+    session.clear()
+    flash("Anda telah log keluar.", "info")
+    return redirect(url_for('login'))
+
 if __name__ == "__main__":
     app.run(debug=True)
